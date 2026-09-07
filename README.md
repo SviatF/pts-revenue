@@ -56,7 +56,7 @@ Current project settings are treated as live data. Press **Close month** to free
 Use the repository as a static site.
 
 - Build command: leave empty
-- Build output directory: `/`
+- Build output directory: `.`
 
 No Node runtime is required.
 
