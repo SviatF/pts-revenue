@@ -455,7 +455,9 @@
   function renderProjects() {
     const filter = $("#projectStatusFilter").value;
     let projects = [...state.projects];
-    if (filter !== "all") projects = projects.filter(p => p.status === filter);
+    if (filter === "active") projects = projects.filter(p => activeForMonth(p, selectedMonth));
+    if (filter === "paused") projects = projects.filter(p => p.status === "paused");
+    if (filter === "churned") projects = projects.filter(p => p.inactiveFrom ? selectedMonth >= p.inactiveFrom : p.status === "churned");
     const activeRows = rowsForMonth(selectedMonth);
     const m = metrics(activeRows);
     $("#projectMrr").textContent = money.format(m.revenue);
