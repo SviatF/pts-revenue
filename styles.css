@@ -695,3 +695,8 @@ body:before{
   .ambient-orb{filter:blur(85px);opacity:.22}
   .ambient-grid{opacity:.5}
 }
+
+/* Keep the animated atmosphere visible above the page canvas but below UI */
+.ambient-layer{z-index:0}
+.app-shell{position:relative;z-index:1}
+.modal-backdrop,.confirm-backdrop,.toast{z-index:60}
