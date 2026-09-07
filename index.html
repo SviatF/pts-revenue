@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#080808" />
+  <meta name="description" content="PTS Finance — lightweight agency revenue, payroll and profitability dashboard." />
+  <title>PTS Finance</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">PTS</div>
+        <div>
+          <strong>FINANCE</strong>
+          <span>Agency control</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Основна навігація">
+        <button class="nav-item active" data-view="overview">
+          <span class="nav-icon">⌂</span><span>Overview</span>
+        </button>
+        <button class="nav-item" data-view="projects">
+          <span class="nav-icon">□</span><span>Projects</span>
+        </button>
+        <button class="nav-item" data-view="team">
+          <span class="nav-icon">◇</span><span>Team</span>
+        </button>
+        <button class="nav-item" data-view="analytics">
+          <span class="nav-icon">⌁</span><span>Analytics</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="nav-item" id="exportDataBtn">
+          <span class="nav-icon">↓</span><span>Export backup</span>
+        </button>
+        <label class="nav-item file-label" for="importDataInput">
+          <span class="nav-icon">↑</span><span>Import backup</span>
+        </label>
+        <input id="importDataInput" type="file" accept="application/json" hidden />
+        <div class="storage-note">
+          <span class="status-dot"></span>
+          <span>Local data · zero backend</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenuBtn" aria-label="Відкрити меню">☰</button>
+        <div>
+          <div class="eyebrow" id="pageEyebrow">PTS Finance</div>
+          <h1 id="pageTitle">Overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="month-control">
+            <button id="prevMonthBtn" aria-label="Попередній місяць">‹</button>
+            <input id="monthPicker" type="month" />
+            <button id="nextMonthBtn" aria-label="Наступний місяць">›</button>
+          </div>
+          <button class="btn btn-ghost" id="closeMonthBtn">Close month</button>
+          <button class="btn btn-primary" id="quickAddProjectBtn">+ Add project</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-overview">
+        <div class="month-status-row">
+          <div>
+            <span class="month-name" id="overviewMonthName">—</span>
+            <span class="month-state" id="monthStateBadge">LIVE</span>
+          </div>
+          <span class="muted" id="monthStatusText">Live calculation from active projects</span>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi-card featured">
+            <span class="kpi-label">Total revenue</span>
+            <strong class="kpi-value" id="kpiRevenue">$0</strong>
+            <span class="kpi-meta" id="kpiRevenueChange">No previous month data</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-label">Agency net</span>
+            <strong class="kpi-value" id="kpiNet">$0</strong>
+            <span class="kpi-meta" id="kpiNetChange">—</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-label">Total payroll</span>
+            <strong class="kpi-value" id="kpiPayroll">$0</strong>
+            <span class="kpi-meta" id="kpiPayrollRatio">0% of revenue</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-label">Net margin</span>
+            <strong class="kpi-value" id="kpiMargin">0%</strong>
+            <span class="kpi-meta" id="kpiMarginChange">—</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-label">Active projects</span>
+            <strong class="kpi-value" id="kpiProjects">0</strong>
+            <span class="kpi-meta">in selected month</span>
+          </article>
+          <article class="kpi-card">
+            <span class="kpi-label">Avg project value</span>
+            <strong class="kpi-value" id="kpiAvg">$0</strong>
+            <span class="kpi-meta">monthly revenue</span>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div>
+                <span class="panel-kicker">12 MONTHS</span>
+                <h2>Revenue vs net profit</h2>
+              </div>
+              <div class="legend">
+                <span><i class="legend-line white"></i>Revenue</span>
+                <span><i class="legend-line gray"></i>Agency net</span>
+              </div>
+            </div>
+            <div id="revenueChart" class="chart chart-large" aria-label="Revenue and net profit chart"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="panel-kicker">COST STRUCTURE</span>
+                <h2>Where money goes</h2>
+              </div>
+            </div>
+            <div id="costStack" class="cost-stack"></div>
+            <div id="costBreakdown" class="breakdown-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="panel-kicker">PROFITABILITY</span>
+                <h2>Top projects</h2>
+              </div>
+              <button class="text-btn" data-jump="projects">View all</button>
+            </div>
+            <div id="topProjects" class="rank-list"></div>
+          </article>
+
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div>
+                <span class="panel-kicker">CASH CONTROL</span>
+                <h2>Projects this month</h2>
+              </div>
+              <div class="collection-summary">
+                <span>Collected</span>
+                <strong id="collectedRevenue">$0</strong>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Revenue</th>
+                    <th>Payroll</th>
+                    <th>Net</th>
+                    <th>Margin</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody id="overviewProjectsTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="view-projects">
+        <div class="section-toolbar">
+          <div class="toolbar-copy">
+            <span class="eyebrow">PORTFOLIO</span>
+            <h2>Project economics</h2>
+            <p>Revenue, payroll, margin and team economics for every client.</p>
+          </div>
+          <div class="toolbar-actions">
+            <select id="projectStatusFilter" class="select-control">
+              <option value="all">All projects</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="churned">Churned</option>
+            </select>
+            <button class="btn btn-primary" id="addProjectBtn">+ Add project</button>
+          </div>
+        </div>
+
+        <div class="project-summary-grid">
+          <article class="mini-stat"><span>Portfolio MRR</span><strong id="projectMrr">$0</strong></article>
+          <article class="mini-stat"><span>Agency net</span><strong id="projectNet">$0</strong></article>
+          <article class="mini-stat"><span>Portfolio margin</span><strong id="projectMargin">0%</strong></article>
+          <article class="mini-stat"><span>Projects</span><strong id="projectCount">0</strong></article>
+        </div>
+
+        <article class="panel">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Revenue</th>
+                  <th>Target</th>
+                  <th>Performance</th>
+                  <th>Lead</th>
+                  <th>Total payroll</th>
+                  <th>Agency net</th>
+                  <th>Margin</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="projectsTable"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="projectsEmpty">
+            <div class="empty-icon">+</div>
+            <h3>Add your first project</h3>
+            <p>The dashboard will instantly calculate payroll, net profit and margin.</p>
+            <button class="btn btn-primary" data-open-project>+ Add project</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-team">
+        <div class="section-toolbar">
+          <div class="toolbar-copy">
+            <span class="eyebrow">PEOPLE</span>
+            <h2>Team payroll</h2>
+            <p>Track salary history and project load for each team member.</p>
+          </div>
+          <button class="btn btn-primary" id="addMemberBtn">+ Add member</button>
+        </div>
+
+        <div class="team-grid" id="teamCards"></div>
+
+        <article class="panel employee-panel">
+          <div class="panel-head employee-head">
+            <div>
+              <span class="panel-kicker">INDIVIDUAL ANALYTICS</span>
+              <h2 id="employeeAnalyticsTitle">Select a team member</h2>
+            </div>
+            <select id="employeeSelect" class="select-control">
+              <option value="">Select member</option>
+            </select>
+          </div>
+          <div id="employeeAnalyticsEmpty" class="empty-inline">Add or select a team member to see salary history.</div>
+          <div id="employeeAnalytics" hidden>
+            <div class="employee-kpis">
+              <div><span>Salary this month</span><strong id="employeeSalary">$0</strong></div>
+              <div><span>Projects</span><strong id="employeeProjectsCount">0</strong></div>
+              <div><span>Revenue managed</span><strong id="employeeRevenue">$0</strong></div>
+              <div><span>Change</span><strong id="employeeChange">—</strong></div>
+            </div>
+            <div id="employeeSalaryChart" class="chart employee-chart"></div>
+            <div class="table-wrap">
+              <table class="data-table compact">
+                <thead>
+                  <tr><th>Project</th><th>Role</th><th>Salary</th><th>Project revenue</th></tr>
+                </thead>
+                <tbody id="employeeProjectRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="view-analytics">
+        <div class="section-toolbar">
+          <div class="toolbar-copy">
+            <span class="eyebrow">ANALYTICS</span>
+            <h2>Agency performance</h2>
+            <p>Revenue quality, payroll efficiency and profitability over time.</p>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div><span class="panel-kicker">12 MONTHS</span><h2>Agency margin</h2></div>
+            </div>
+            <div id="marginChart" class="chart chart-large"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div><span class="panel-kicker">EFFICIENCY</span><h2>Core ratios</h2></div>
+            </div>
+            <div class="ratio-list">
+              <div><span>Payroll / Revenue</span><strong id="ratioPayroll">0%</strong></div>
+              <div><span>Net / Revenue</span><strong id="ratioNet">0%</strong></div>
+              <div><span>Revenue / Team member</span><strong id="ratioRevenuePerson">$0</strong></div>
+              <div><span>Top 5 revenue concentration</span><strong id="ratioConcentration">0%</strong></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div><span class="panel-kicker">PAYROLL</span><h2>By role</h2></div>
+            </div>
+            <div id="rolePayroll" class="bar-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div><span class="panel-kicker">RISK</span><h2>Lowest margin</h2></div>
+            </div>
+            <div id="lowMarginProjects" class="rank-list"></div>
+          </article>
+
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div><span class="panel-kicker">FORECAST</span><h2>Run-rate</h2></div>
+            </div>
+            <div class="forecast-grid">
+              <div><span>Current MRR</span><strong id="forecastMrr">$0</strong></div>
+              <div><span>Annual revenue run-rate</span><strong id="forecastRevenue">$0</strong></div>
+              <div><span>Annual net run-rate</span><strong id="forecastNet">$0</strong></div>
+              <div><span>Current net margin</span><strong id="forecastMargin">0%</strong></div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="projectModal" hidden>
+    <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">PROJECT ECONOMICS</span>
+          <h2 id="projectModalTitle">Add project</h2>
+        </div>
+        <button class="icon-btn" data-close-project aria-label="Закрити">×</button>
+      </div>
+      <form id="projectForm">
+        <input type="hidden" id="projectId" />
+        <div class="project-form-layout">
+          <div class="form-fields">
+            <label>
+              <span>Project name</span>
+              <input id="projectName" required autocomplete="off" placeholder="The Camp" />
+            </label>
+            <label>
+              <span>Monthly payment, $</span>
+              <input id="projectRevenue" type="number" min="0" step="0.01" required placeholder="1200" />
+            </label>
+            <div class="form-row">
+              <label>
+                <span>Targetologist rate, $</span>
+                <input id="targetSalary" type="number" min="0" step="0.01" required placeholder="250" />
+              </label>
+              <label>
+                <span>Performance, %</span>
+                <input id="performancePct" type="number" min="0" max="100" step="0.01" required placeholder="30" />
+              </label>
+            </div>
+            <label>
+              <span>Lead manager, % of full check</span>
+              <input id="leadPct" type="number" min="0" max="100" step="0.01" required placeholder="5" />
+            </label>
+
+            <details class="advanced">
+              <summary>Team assignments <span>optional</span></summary>
+              <div class="advanced-grid">
+                <label><span>Targetologist</span><select id="targetologistId"></select></label>
+                <label><span>Performance marketer</span><select id="performanceId"></select></label>
+                <label><span>Lead manager</span><select id="leadManagerId"></select></label>
+              </div>
+            </details>
+
+            <div class="form-row">
+              <label>
+                <span>Status</span>
+                <select id="projectStatus">
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="churned">Churned</option>
+                </select>
+              </label>
+              <label>
+                <span>Start month</span>
+                <input id="projectStartMonth" type="month" required />
+              </label>
+            </div>
+          </div>
+
+          <aside class="live-model">
+            <span class="panel-kicker">MONTHLY MODEL</span>
+            <div class="model-main">
+              <span>Agency net</span>
+              <strong id="modelNet">$0</strong>
+              <em id="modelMargin">0% margin</em>
+            </div>
+            <div class="model-lines">
+              <div><span>Revenue</span><strong id="modelRevenue">$0</strong></div>
+              <div><span>Targetologist</span><strong id="modelTarget">−$0</strong></div>
+              <div><span>Performance</span><strong id="modelPerformance">−$0</strong></div>
+              <div><span>Lead manager</span><strong id="modelLead">−$0</strong></div>
+              <div class="model-total"><span>Total payroll</span><strong id="modelPayroll">$0</strong></div>
+            </div>
+            <p id="modelFormula">Performance = (Revenue − Targetologist) × %</p>
+          </aside>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="deleteProjectBtn" hidden>Delete</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn btn-ghost" data-close-project>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="memberModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="memberModalTitle">
+      <div class="modal-head">
+        <div><span class="eyebrow">TEAM</span><h2 id="memberModalTitle">Add member</h2></div>
+        <button class="icon-btn" data-close-member aria-label="Закрити">×</button>
+      </div>
+      <form id="memberForm">
+        <input type="hidden" id="memberId" />
+        <label>
+          <span>Name</span>
+          <input id="memberName" required autocomplete="off" placeholder="Sasha" />
+        </label>
+        <label>
+          <span>Primary role</span>
+          <select id="memberRole" required>
+            <option value="targetologist">Targetologist</option>
+            <option value="performance">Performance marketer</option>
+            <option value="lead">Lead manager</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="deleteMemberBtn" hidden>Delete</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn btn-ghost" data-close-member>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="confirm-backdrop" id="confirmDialog" hidden>
+    <div class="confirm-box">
+      <h3 id="confirmTitle">Confirm</h3>
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+        <button class="btn btn-primary" id="confirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
