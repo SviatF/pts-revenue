@@ -286,3 +286,37 @@ body:before{
   .cost-layout{grid-template-columns:1fr}.overview-side-metrics{grid-template-columns:1fr}
   .sidebar-promo{min-height:170px}
 }
+
+
+/* Role-based payroll */
+.role-team-sections{display:grid;gap:14px;margin-bottom:14px}
+.role-team-block{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,rgba(10,14,19,.98),rgba(6,9,13,.98));padding:14px}
+.role-team-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.role-team-head>div{display:flex;align-items:center;gap:10px}
+.role-team-head h3{font-size:14px;margin:3px 0 0;letter-spacing:-.02em}
+.role-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.role-target .role-dot{background:var(--pink);box-shadow:0 0 12px rgba(255,47,146,.55)}
+.role-performance .role-dot{background:var(--purple);box-shadow:0 0 12px rgba(147,87,255,.55)}
+.role-lead .role-dot{background:var(--blue);box-shadow:0 0 12px rgba(55,185,255,.55)}
+.role-add-btn,.inline-add-member{border:1px solid rgba(255,47,146,.25);border-radius:8px;background:rgba(255,47,146,.055);color:#ff80bc;height:30px;padding:0 10px;font-size:9px;font-weight:700}
+.role-add-btn:hover,.inline-add-member:hover{border-color:rgba(255,47,146,.65);color:#fff;box-shadow:0 0 14px rgba(255,47,146,.12)}
+.role-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0}
+.role-empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:#596473;font-size:10px}
+
+.project-role-stack{display:grid;gap:10px}
+.project-role-card{border:1px solid var(--line);border-radius:12px;background:#090d12;padding:12px;position:relative;overflow:hidden}
+.project-role-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:1px}
+.project-role-card.role-target:before{background:var(--pink);box-shadow:0 0 10px rgba(255,47,146,.5)}
+.project-role-card.role-performance:before{background:var(--purple);box-shadow:0 0 10px rgba(147,87,255,.5)}
+.project-role-card.role-lead:before{background:var(--blue);box-shadow:0 0 10px rgba(55,185,255,.5)}
+.project-role-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:11px}
+.project-role-title>div{display:flex;align-items:center;gap:9px}
+.project-role-title strong{display:block;font-size:11px;color:#edf2f8}
+.project-role-title small{display:block;margin-top:3px;color:#66717f;font-size:8px}
+.project-role-fields{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(120px,.75fr);gap:8px}
+.role-calculation{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);margin-top:10px;padding-top:9px}
+.role-calculation span{font-size:8px;color:#687383}.role-calculation strong{font-size:13px}
+.project-role-person strong{display:block;font-size:9px;color:#e7edf5}.project-role-person span{display:block;margin-top:3px;font-size:8px;color:#707b89}
+
+@media(max-width:1180px){.role-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.role-grid{grid-template-columns:1fr}.project-role-fields{grid-template-columns:1fr}}
