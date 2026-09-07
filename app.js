@@ -605,23 +605,24 @@
     ).join("");
   }
 
-  function readTargetologistRows(containerSelector) {
+  function readTargetologistRows(containerSelector, includeEmpty = false) {
     const container = $(containerSelector);
     if (!container) return [];
-    return $$(".targetologist-assignment-row", container).map(row => ({
+    const rows = $(".targetologist-assignment-row", container).map(row => ({
       memberId: $(".target-person-select", row)?.value || "",
       salary: Math.max(0, n($(".target-salary-input", row)?.value))
-    })).filter(item => item.memberId || item.salary > 0);
+    }));
+    return includeEmpty ? rows : rows.filter(item => item.memberId || item.salary > 0);
   }
 
   function addTargetologistRow(containerSelector, scope, preset = {}) {
-    const current = readTargetologistRows(containerSelector);
+    const current = readTargetologistRows(containerSelector,true);
     current.push({ memberId:preset.memberId || "", salary:n(preset.salary) });
     renderTargetologistRows(containerSelector,current,scope);
   }
 
   function removeTargetologistRow(containerSelector, scope, index) {
-    const current = readTargetologistRows(containerSelector);
+    const current = readTargetologistRows(containerSelector,true);
     current.splice(Number(index),1);
     renderTargetologistRows(containerSelector,current.length ? current : [{memberId:"",salary:0}],scope);
   }
