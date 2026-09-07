@@ -21,7 +21,7 @@
   let state = loadState();
 
   function defaultState() {
-    return { version: 1, projects: [], team: [], snapshots: [], closedMonths: [], createdAt: new Date().toISOString() };
+    return { version: 2, projects: [], team: [], snapshots: [], monthlySettings: [], closedMonths: [], createdAt: new Date().toISOString() };
   }
 
   function loadState() {
@@ -99,17 +99,64 @@
     return { revenue, targetSalary, performancePct, performanceBase, performanceSalary, leadPct, leadSalary, totalPayroll, agencyNet, margin };
   }
 
-  function projectToRow(project, paymentStatus = "paid") {
-    const e = computeEconomics(project.monthlyFee, project.targetSalary, project.performancePct, project.leadPct);
+  function financeFields(source = {}) {
+    return {
+      monthlyFee: n(source.monthlyFee),
+      targetSalary: n(source.targetSalary),
+      performancePct: n(source.performancePct),
+      leadPct: n(source.leadPct),
+      targetologistId: source.targetologistId || "",
+      performanceId: source.performanceId || "",
+      leadManagerId: source.leadManagerId || ""
+    };
+  }
+
+  function ensureProjectBaseline(project) {
+    if (!project || state.monthlySettings.some(s => s.projectId === project.id)) return;
+    state.monthlySettings.push({
+      id: uid("terms"),
+      projectId: project.id,
+      effectiveMonth: project.startMonth || currentMonth,
+      ...financeFields(project),
+      createdAt: project.createdAt || new Date().toISOString()
+    });
+  }
+
+  function settingsForProjectMonth(project, month) {
+    const history = state.monthlySettings
+      .filter(s => s.projectId === project.id && s.effectiveMonth <= month)
+      .sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+    const effective = history.length ? history[history.length - 1] : null;
+    return effective ? { ...project, ...effective } : { ...project };
+  }
+
+  function upsertProjectSettings(projectId, effectiveMonth, values) {
+    const idx = state.monthlySettings.findIndex(s => s.projectId === projectId && s.effectiveMonth === effectiveMonth);
+    const record = {
+      id: idx >= 0 ? state.monthlySettings[idx].id : uid("terms"),
+      projectId,
+      effectiveMonth,
+      ...financeFields(values),
+      updatedAt: new Date().toISOString()
+    };
+    if (idx >= 0) state.monthlySettings[idx] = { ...state.monthlySettings[idx], ...record };
+    else state.monthlySettings.push(record);
+    return record;
+  }
+
+  function projectToRow(project, paymentStatus = "paid", month = selectedMonth) {
+    const terms = settingsForProjectMonth(project, month);
+    const e = computeEconomics(terms.monthlyFee, terms.targetSalary, terms.performancePct, terms.leadPct);
     return {
       id: "live_" + project.id,
       projectId: project.id,
       projectName: project.name,
-      month: selectedMonth,
+      month,
       paymentStatus,
-      targetologistId: project.targetologistId || "",
-      performanceId: project.performanceId || "",
-      leadManagerId: project.leadManagerId || "",
+      targetologistId: terms.targetologistId || "",
+      performanceId: terms.performanceId || "",
+      leadManagerId: terms.leadManagerId || "",
+      effectiveMonth: terms.effectiveMonth || project.startMonth || month,
       ...e
     };
   }
@@ -132,9 +179,7 @@
       .map(p => {
         const saved = snapshotByProject.get(p.id);
         if (saved?.manualOverride) return saved;
-        const row = projectToRow(p, saved?.paymentStatus || "paid");
-        row.month = month;
-        return row;
+        return projectToRow(p, saved?.paymentStatus || "paid", month);
       });
   }
 
@@ -192,13 +237,11 @@
     const liveRows = state.projects.filter(p => p.status === "active" && (!p.startMonth || p.startMonth <= month)).map(p => {
       const old = state.snapshots.find(s => s.month === month && s.projectId === p.id);
       if (old?.manualOverride) return { ...old };
-      const e = computeEconomics(p.monthlyFee, p.targetSalary, p.performancePct, p.leadPct);
+      const row = projectToRow(p, old?.paymentStatus || "paid", month);
       return {
-        id: old?.id || uid("snap"), month, projectId: p.id, projectName: p.name,
-        paymentStatus: old?.paymentStatus || "paid",
-        targetologistId: p.targetologistId || "", performanceId: p.performanceId || "", leadManagerId: p.leadManagerId || "",
-        manualOverride: false,
-        ...e
+        ...row,
+        id: old?.id || uid("snap"),
+        manualOverride: false
       };
     });
     state.snapshots = [...existing, ...liveRows];
@@ -211,10 +254,9 @@
     if (snap) return snap;
     const p = state.projects.find(x => x.id === projectId);
     if (!p) return null;
-    const e = computeEconomics(p.monthlyFee, p.targetSalary, p.performancePct, p.leadPct);
     snap = {
-      id: uid("snap"), month, projectId: p.id, projectName: p.name, paymentStatus: "paid",
-      targetologistId: p.targetologistId || "", performanceId: p.performanceId || "", leadManagerId: p.leadManagerId || "", ...e
+      ...projectToRow(p, "paid", month),
+      id: uid("snap")
     };
     state.snapshots.push(snap);
     return snap;
@@ -378,10 +420,11 @@
 
     $("#projectsEmpty").hidden = state.projects.length > 0;
     $("#projectsTable").innerHTML = projects.map(p => {
-      const e = computeEconomics(p.monthlyFee,p.targetSalary,p.performancePct,p.leadPct);
-      const target = getMember(p.targetologistId);
-      const performance = getMember(p.performanceId);
-      const lead = getMember(p.leadManagerId);
+      const terms = settingsForProjectMonth(p, selectedMonth);
+      const e = computeEconomics(terms.monthlyFee,terms.targetSalary,terms.performancePct,terms.leadPct);
+      const target = getMember(terms.targetologistId);
+      const performance = getMember(terms.performanceId);
+      const lead = getMember(terms.leadManagerId);
       const roleCell = (member, salary, detail = "") =>
         '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(salary) + (detail ? ' · ' + detail : '') + '</span></div>';
       return '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(p.name)) + '</span><div><strong>' + esc(p.name) + '</strong><br><span class="status-pill ' + esc(p.status) + '">' + esc(p.status) + '</span></div></div></td><td><strong>' + money.format(e.revenue) + '</strong></td><td>' + roleCell(target,e.targetSalary,"fixed") + '</td><td>' + roleCell(performance,e.performanceSalary,pct(e.performancePct)) + '</td><td>' + roleCell(lead,e.leadSalary,pct(e.leadPct)) + '</td><td>' + money.format(e.totalPayroll) + '</td><td><strong>' + money.format(e.agencyNet) + '</strong></td><td>' + pct(e.margin) + '</td><td><div class="row-actions"><button class="small-icon-btn" data-edit-project="' + p.id + '" aria-label="Edit">···</button></div></td></tr>';
@@ -510,17 +553,22 @@
 
   function openProjectModal(projectId = "") {
     const p = state.projects.find(x=>x.id===projectId);
+    const terms = p ? settingsForProjectMonth(p, selectedMonth) : {};
     $("#projectModal").hidden=false;
-    $("#projectModalTitle").textContent=p?"Edit project":"Add project";
+    $("#projectModalTitle").textContent=p?("Edit project · " + monthLabel(selectedMonth)):"Add project";
     $("#projectId").value=p?.id||"";
     $("#projectName").value=p?.name||"";
-    $("#projectRevenue").value=p?.monthlyFee??"";
-    $("#targetSalary").value=p?.targetSalary??"";
-    $("#performancePct").value=p?.performancePct??"";
-    $("#leadPct").value=p?.leadPct??"";
+    $("#projectRevenue").value=p ? n(terms.monthlyFee) : "";
+    $("#targetSalary").value=p ? n(terms.targetSalary) : "";
+    $("#performancePct").value=p ? n(terms.performancePct) : "";
+    $("#leadPct").value=p ? n(terms.leadPct) : "";
     $("#projectStatus").value=p?.status||"active";
     $("#projectStartMonth").value=p?.startMonth||selectedMonth;
-    populateAssignmentSelects(p||{});
+    populateAssignmentSelects(p ? terms : {});
+    $("#projectEffectiveMonth").textContent = p ? monthLabel(selectedMonth) : monthLabel($("#projectStartMonth").value || selectedMonth);
+    $("#projectTermsHelp").textContent = p
+      ? "Changes start from this month. Earlier months keep their original revenue, rates and team."
+      : "These are the starting terms for the project.";
     $("#deleteProjectBtn").hidden=!p;
     updateLiveModel();
     setTimeout(()=>$("#projectName").focus(),0);
@@ -547,29 +595,41 @@
   function submitProject(ev) {
     ev.preventDefault();
     const id=$("#projectId").value;
-    const project={
-      id:id||uid("prj"),
-      name:$("#projectName").value.trim(),
+    const financials={
       monthlyFee:n($("#projectRevenue").value),
       targetSalary:n($("#targetSalary").value),
       performancePct:n($("#performancePct").value),
       leadPct:n($("#leadPct").value),
       targetologistId:$("#targetologistId").value,
       performanceId:$("#performanceId").value,
-      leadManagerId:$("#leadManagerId").value,
+      leadManagerId:$("#leadManagerId").value
+    };
+    const startMonth=$("#projectStartMonth").value||selectedMonth;
+    const project={
+      id:id||uid("prj"),
+      name:$("#projectName").value.trim(),
+      ...financials,
       status:$("#projectStatus").value,
-      startMonth:$("#projectStartMonth").value||selectedMonth,
+      startMonth,
       updatedAt:new Date().toISOString()
     };
     if(!project.name) return;
+
     if(id){
       const idx=state.projects.findIndex(x=>x.id===id);
+      const previous=idx>=0?state.projects[idx]:null;
+      if(previous) ensureProjectBaseline(previous);
+
+      const effectiveMonth = selectedMonth < startMonth ? startMonth : selectedMonth;
+      upsertProjectSettings(id,effectiveMonth,financials);
+
       if(idx>=0) state.projects[idx]={...state.projects[idx],...project};
-      showToast("Project updated");
+      showToast("Terms saved from " + monthLabel(effectiveMonth) + " · earlier months preserved");
     }else{
       project.createdAt=new Date().toISOString();
       state.projects.push(project);
-      showToast("Project added");
+      upsertProjectSettings(project.id,startMonth,financials);
+      showToast("Project added from " + monthLabel(startMonth));
     }
     saveState();closeProjectModal();render();
   }
