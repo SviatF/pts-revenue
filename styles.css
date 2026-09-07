@@ -333,3 +333,44 @@ body:before{
 .effective-terms-note strong{display:block;margin-top:3px;font-size:11px;color:#ff76b7}
 .effective-terms-note p{margin:0;color:#737e8c;font-size:9px;line-height:1.45;text-align:right}
 @media(max-width:620px){.effective-terms-note{align-items:flex-start;flex-direction:column}.effective-terms-note p{text-align:left}}
+
+
+/* Multiple targetologists */
+.role-title-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.inline-add-member.primary-inline{
+  color:#fff;border-color:rgba(255,47,146,.5);
+  background:linear-gradient(180deg,rgba(255,47,146,.19),rgba(255,47,146,.08));
+  box-shadow:0 0 14px rgba(255,47,146,.08)
+}
+.targetologist-rows{display:grid;gap:8px}
+.targetologist-assignment-row{
+  display:grid;grid-template-columns:minmax(0,1.25fr) minmax(130px,.7fr) 34px;
+  gap:8px;align-items:end;padding:9px;border:1px solid rgba(183,196,216,.11);
+  border-radius:10px;background:rgba(4,7,10,.46)
+}
+.targetologist-assignment-row label{min-width:0}
+.targetologist-assignment-row select,.targetologist-assignment-row input{height:38px}
+.remove-targetologist-btn{
+  width:34px;height:38px;border-radius:8px;border:1px solid rgba(255,70,95,.18);
+  background:rgba(255,70,95,.045);color:#9c6570;font-size:17px
+}
+.remove-targetologist-btn:hover{color:#ff8190;border-color:rgba(255,70,95,.5);background:rgba(255,70,95,.08)}
+.adjustment-targets-block{
+  border:1px solid rgba(255,47,146,.16);border-radius:12px;padding:11px;background:#090d12
+}
+.adjustment-targets-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.adjustment-targets-head>div{display:flex;align-items:center;gap:8px}
+.adjustment-targets-head strong{font-size:10px;color:#eaf0f6}
+.project-target-list{display:grid;gap:5px}
+.project-target-list .project-role-person+ .project-role-person{padding-top:5px;border-top:1px solid rgba(255,255,255,.05)}
+.target-total-line{margin-top:2px;padding-top:5px;border-top:1px solid rgba(255,47,146,.12);font-size:8px;color:#ff73b5;font-weight:700}
+@media(max-width:720px){
+  .project-role-title{align-items:flex-start;flex-direction:column}
+  .role-title-actions{justify-content:flex-start}
+  .targetologist-assignment-row{grid-template-columns:1fr 1fr 34px}
+}
+@media(max-width:520px){
+  .targetologist-assignment-row{grid-template-columns:1fr 34px}
+  .targetologist-assignment-row label{grid-column:1}
+  .remove-targetologist-btn{grid-column:2;grid-row:1/3;height:100%}
+}
