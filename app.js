@@ -907,7 +907,7 @@
   $("#deleteProjectBtn").addEventListener("click",deleteProject);
   $("#projectStatusFilter").addEventListener("change",renderProjects);
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
-  $("[data-close-adjustment]").forEach(x=>x.addEventListener("click",closeAdjustmentModal));
+  document.querySelectorAll("[data-close-adjustment]").forEach(x=>x.addEventListener("click",closeAdjustmentModal));
   $("#adjustmentForm").addEventListener("submit",submitAdjustment);
   ["#adjustRevenue","#adjustTargetSalary","#adjustPerformancePct","#adjustLeadPct"].forEach(s=>$(s).addEventListener("input",updateAdjustmentLiveModel));
   $("#removeAdjustmentBtn").addEventListener("click",removeAdjustment);
