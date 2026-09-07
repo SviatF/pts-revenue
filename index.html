@@ -285,7 +285,33 @@
           <button class="btn btn-primary" id="addMemberBtn">+ Add member</button>
         </div>
 
-        <div class="team-grid" id="teamCards"></div>
+        <div class="role-team-sections">
+          <section class="role-team-block role-target">
+            <div class="role-team-head">
+              <div><span class="role-dot"></span><div><span class="eyebrow">ROLE</span><h3>Targetologists</h3></div></div>
+              <button class="role-add-btn" data-add-role-member="targetologist">+ Add</button>
+            </div>
+            <div class="team-grid role-grid" id="targetologistCards"></div>
+          </section>
+
+          <section class="role-team-block role-performance">
+            <div class="role-team-head">
+              <div><span class="role-dot"></span><div><span class="eyebrow">ROLE</span><h3>Performance marketers</h3></div></div>
+              <button class="role-add-btn" data-add-role-member="performance">+ Add</button>
+            </div>
+            <div class="team-grid role-grid" id="performanceCards"></div>
+          </section>
+
+          <section class="role-team-block role-lead">
+            <div class="role-team-head">
+              <div><span class="role-dot"></span><div><span class="eyebrow">ROLE</span><h3>Lead managers</h3></div></div>
+              <button class="role-add-btn" data-add-role-member="lead">+ Add</button>
+            </div>
+            <div class="team-grid role-grid" id="leadCards"></div>
+          </section>
+        </div>
+
+        <div id="teamCards" hidden></div>
 
         <article class="panel employee-panel">
           <div class="panel-head employee-head">
@@ -443,29 +469,61 @@
               <span>Monthly payment, $</span>
               <input id="projectRevenue" type="number" min="0" step="0.01" required placeholder="1200" />
             </label>
-            <div class="form-row">
-              <label>
-                <span>Targetologist rate, $</span>
-                <input id="targetSalary" type="number" min="0" step="0.01" required placeholder="250" />
-              </label>
-              <label>
-                <span>Performance, %</span>
-                <input id="performancePct" type="number" min="0" max="100" step="0.01" required placeholder="30" />
-              </label>
-            </div>
-            <label>
-              <span>Lead manager, % of full check</span>
-              <input id="leadPct" type="number" min="0" max="100" step="0.01" required placeholder="5" />
-            </label>
+            <div class="project-role-stack">
+              <section class="project-role-card role-target">
+                <div class="project-role-title">
+                  <div><span class="role-dot"></span><div><strong>Targetologist</strong><small>Fixed salary per project</small></div></div>
+                  <button type="button" class="inline-add-member" data-inline-add-role="targetologist">+ Add person</button>
+                </div>
+                <div class="project-role-fields">
+                  <label>
+                    <span>Person</span>
+                    <select id="targetologistId"></select>
+                  </label>
+                  <label>
+                    <span>Fixed salary, $</span>
+                    <input id="targetSalary" type="number" min="0" step="0.01" required placeholder="250" />
+                  </label>
+                </div>
+                <div class="role-calculation"><span>Salary from this project</span><strong id="targetSalaryPreview">$0</strong></div>
+              </section>
 
-            <details class="advanced">
-              <summary>Team assignments <span>optional</span></summary>
-              <div class="advanced-grid">
-                <label><span>Targetologist</span><select id="targetologistId"></select></label>
-                <label><span>Performance marketer</span><select id="performanceId"></select></label>
-                <label><span>Lead manager</span><select id="leadManagerId"></select></label>
-              </div>
-            </details>
+              <section class="project-role-card role-performance">
+                <div class="project-role-title">
+                  <div><span class="role-dot"></span><div><strong>Performance marketer</strong><small>% after targetologist salary</small></div></div>
+                  <button type="button" class="inline-add-member" data-inline-add-role="performance">+ Add person</button>
+                </div>
+                <div class="project-role-fields">
+                  <label>
+                    <span>Person</span>
+                    <select id="performanceId"></select>
+                  </label>
+                  <label>
+                    <span>Performance, %</span>
+                    <input id="performancePct" type="number" min="0" max="100" step="0.01" required placeholder="30" />
+                  </label>
+                </div>
+                <div class="role-calculation"><span id="performanceBasePreview">Base: $0</span><strong id="performanceSalaryPreview">$0</strong></div>
+              </section>
+
+              <section class="project-role-card role-lead">
+                <div class="project-role-title">
+                  <div><span class="role-dot"></span><div><strong>Lead manager</strong><small>% from full project check</small></div></div>
+                  <button type="button" class="inline-add-member" data-inline-add-role="lead">+ Add person</button>
+                </div>
+                <div class="project-role-fields">
+                  <label>
+                    <span>Person</span>
+                    <select id="leadManagerId"></select>
+                  </label>
+                  <label>
+                    <span>Lead manager, %</span>
+                    <input id="leadPct" type="number" min="0" max="100" step="0.01" required placeholder="5" />
+                  </label>
+                </div>
+                <div class="role-calculation"><span>From full revenue</span><strong id="leadSalaryPreview">$0</strong></div>
+              </section>
+            </div>
 
             <div class="form-row">
               <label>
