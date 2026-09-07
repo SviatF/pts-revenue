@@ -250,6 +250,21 @@
     render();
   }
 
+  function miniSparkline(container, values, color = "#ff2f92") {
+    const el = typeof container === "string" ? $(container) : container;
+    if (!el) return;
+    const vals = values.map(n);
+    const max = Math.max(...vals, 1);
+    const min = Math.min(...vals, 0);
+    const range = Math.max(1, max - min);
+    const pts = vals.map((v, i) => {
+      const x = 3 + (i / Math.max(1, vals.length - 1)) * 54;
+      const y = 25 - ((v - min) / range) * 19;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    el.innerHTML = '<svg viewBox="0 0 60 30" aria-hidden="true"><defs><filter id="sparkGlow"><feGaussianBlur stdDeviation="1.6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#sparkGlow)"/><circle cx="57" cy="' + (pts.split(" ").pop()?.split(",")[1] || 10) + '" r="1.8" fill="' + color + '"/></svg>';
+  }
+
   function lineChart(container, series, options = {}) {
     const el = typeof container === "string" ? $(container) : container;
     if (!el) return;
@@ -273,11 +288,12 @@
     const labels = series[0].labels.map((lab, i) => '<text x="' + x(i) + '" y="' + (height - 7) + '" fill="#555" font-size="9" text-anchor="middle">' + esc(lab) + "</text>").join("");
     const paths = series.map((s, si) => {
       const d = s.values.map((v, i) => (i ? "L" : "M") + x(i).toFixed(2) + " " + y(n(v)).toFixed(2)).join(" ");
-      const stroke = s.stroke || (si === 0 ? "#f3f3f3" : "#676767");
-      const dots = s.values.map((v, i) => '<circle cx="' + x(i) + '" cy="' + y(n(v)) + '" r="2.2" fill="' + stroke + '"><title>' + esc(s.name) + ": " + esc(options.percent ? pct(n(v)) : money.format(n(v))) + "</title></circle>").join("");
-      return '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + (si === 0 ? 2 : 1.6) + '" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
+      const stroke = s.stroke || (si === 0 ? "#ff2f92" : "#b5beca");
+      const glow = si === 0 ? ' filter="url(#pinkGlow)"' : "";
+      const dots = s.values.map((v, i) => '<circle cx="' + x(i) + '" cy="' + y(n(v)) + '" r="' + (si === 0 ? 2.8 : 2.2) + '" fill="' + stroke + '"' + glow + '><title>' + esc(s.name) + ": " + esc(options.percent ? pct(n(v)) : money.format(n(v))) + "</title></circle>").join("");
+      return '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + (si === 0 ? 2.1 : 1.6) + '" stroke-linecap="round" stroke-linejoin="round"' + glow + '/>' + dots;
     }).join("");
-    el.innerHTML = '<svg viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" role="img">' + grid + labels + paths + "</svg>";
+    el.innerHTML = '<svg viewBox="0 0 ' + width + " " + height + '" preserveAspectRatio="none" role="img"><defs><filter id="pinkGlow"><feGaussianBlur stdDeviation="2.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' + grid + labels + paths + "</svg>";
   }
 
   function renderOverview() {
@@ -310,23 +326,42 @@
     const months = Array.from({ length: 12 }, (_, i) => shiftMonth(selectedMonth, i - 11));
     const history = months.map(k => metrics(rowsForMonth(k)));
     lineChart("#revenueChart", [
-      { name: "Revenue", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.revenue), stroke: "#f4f4f4" },
-      { name: "Agency net", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.net), stroke: "#666" }
+      { name: "Revenue", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.revenue), stroke: "#ff2f92" },
+      { name: "Net profit", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.net), stroke: "#b8c0cc" }
     ]);
 
+    miniSparkline("#sparkRevenue", history.slice(-7).map(x => x.revenue), "#18f28d");
+    miniSparkline("#sparkNet", history.slice(-7).map(x => x.net), "#18f28d");
+    miniSparkline("#sparkPayroll", history.slice(-7).map(x => x.payroll), "#ff2f92");
+    miniSparkline("#sparkMargin", history.slice(-7).map(x => x.margin), "#18f28d");
+    miniSparkline("#sparkProjects", months.slice(-7).map(k => rowsForMonth(k).length), "#ff2f92");
+    miniSparkline("#sparkAvg", history.slice(-7).map(x => x.avg), "#18f28d");
+
     const parts = [
-      { key: "target", name: "Targetologists", value: m.target, cls: "target", dot: "#e8e8e8" },
-      { key: "performance", name: "Performance", value: m.performance, cls: "performance", dot: "#a8a8a8" },
-      { key: "lead", name: "Lead managers", value: m.lead, cls: "lead", dot: "#696969" },
-      { key: "net", name: "Agency net", value: m.net, cls: "net", dot: "#303030" }
+      { key: "target", name: "Targetologists", value: m.target, cls: "target", dot: "#ff2f92" },
+      { key: "performance", name: "Performance", value: m.performance, cls: "performance", dot: "#9357ff" },
+      { key: "lead", name: "Lead managers", value: m.lead, cls: "lead", dot: "#37b9ff" },
+      { key: "net", name: "Agency net", value: m.net, cls: "net", dot: "#17e78a" }
     ];
-    $("#costStack").innerHTML = parts.map(p => '<div class="cost-segment ' + p.cls + '" style="width:' + Math.max(0, m.revenue ? p.value / m.revenue * 100 : 0) + '%"></div>').join("");
-    $("#costBreakdown").innerHTML = parts.map(p => '<div class="breakdown-row"><i class="breakdown-dot" style="background:' + p.dot + '"></i><span class="breakdown-name">' + p.name + '</span><strong class="breakdown-value">' + money.format(p.value) + '</strong><span class="breakdown-pct">' + pct(m.revenue ? p.value / m.revenue * 100 : 0) + "</span></div>").join("");
+    const rawPcts = parts.map(p => Math.max(0, m.revenue ? p.value / m.revenue * 100 : 0));
+    const a = rawPcts[0], b = a + rawPcts[1], d = b + rawPcts[2], e = Math.min(100, d + rawPcts[3]);
+    $("#costStack").style.background = 'conic-gradient(#ff2f92 0 ' + a + '%, #9357ff ' + a + '% ' + b + '%, #37b9ff ' + b + '% ' + d + '%, #17e78a ' + d + '% ' + e + '%, #1a1e25 ' + e + '% 100%)';
+    $("#costStack").innerHTML = '<div class="donut-center"><strong>' + money.format(m.revenue).replace(".00","") + '</strong><span>Total revenue</span></div>';
+    $("#costBreakdown").innerHTML = parts.map(p => '<div class="breakdown-row"><i class="breakdown-dot" style="background:' + p.dot + ';box-shadow:0 0 12px ' + p.dot + '55"></i><span class="breakdown-name">' + p.name + '</span><strong class="breakdown-value">' + money.format(p.value) + '</strong><span class="breakdown-pct">' + pct(m.revenue ? p.value / m.revenue * 100 : 0) + "</span></div>").join("");
+    $("#costMonthChip").textContent = monthLabel(selectedMonth);
 
     const top = [...rows].sort((a,b) => b.agencyNet - a.agencyNet).slice(0,5);
     $("#topProjects").innerHTML = top.length ? top.map((r,i) => '<div class="rank-row"><span class="rank-index">0' + (i+1) + '</span><div class="rank-name"><strong>' + esc(r.projectName) + '</strong><span>' + pct(r.margin) + ' margin</span></div><strong class="rank-value">' + money.format(r.agencyNet) + "</strong></div>").join("") : '<div class="empty-inline">No projects yet.</div>';
 
-    $("#overviewProjectsTable").innerHTML = rows.length ? rows.map(r => '<tr><td><strong>' + esc(r.projectName) + '</strong></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.totalPayroll) + '</td><td><strong>' + money.format(r.agencyNet) + '</strong></td><td>' + pct(r.margin) + '</td><td><select class="payment-select" data-payment-project="' + esc(r.projectId) + '"><option value="paid"' + (r.paymentStatus==="paid"?" selected":"") + '>Paid</option><option value="pending"' + (r.paymentStatus==="pending"?" selected":"") + '>Pending</option><option value="overdue"' + (r.paymentStatus==="overdue"?" selected":"") + ">Overdue</option></select></td></tr>").join("") : '<tr><td colspan="6" class="muted">No projects in this month.</td></tr>';
+    $("#overviewProjectsTable").innerHTML = rows.length ? rows.map(r => '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(r.projectName)) + '</span><strong>' + esc(r.projectName) + '</strong></div></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.totalPayroll) + '</td><td><strong>' + money.format(r.agencyNet) + '</strong></td><td>' + pct(r.margin) + '</td><td><select class="payment-select payment-' + esc(r.paymentStatus) + '" data-payment-project="' + esc(r.projectId) + '"><option value="paid"' + (r.paymentStatus==="paid"?" selected":"") + '>Paid</option><option value="pending"' + (r.paymentStatus==="pending"?" selected":"") + '>Pending</option><option value="overdue"' + (r.paymentStatus==="overdue"?" selected":"") + ">Overdue</option></select></td></tr>").join("") : '<tr><td colspan="6" class="muted">No projects in this month.</td></tr>';
+
+    $("#sideTeamPayroll").textContent = money.format(m.payroll);
+    $("#sideTeamCount").textContent = state.team.length + " team members";
+    $("#sideAvgSalary").textContent = money.format(state.team.length ? m.payroll / state.team.length : 0);
+    $("#sideMargin").textContent = pct(m.margin);
+    $("#sideMarginDelta").innerHTML = marginDelta === null ? "No prior month" : '<span class="' + (marginDelta >= 0 ? "positive" : "negative") + '">' + (marginDelta >= 0 ? "↑ " : "↓ ") + Math.abs(marginDelta).toFixed(1) + 'pp</span>';
+    $("#sideRunRate").textContent = money.format(m.revenue * 12);
+    $("#sideRunRateDelta").textContent = "Annualized current MRR";
   }
 
   function renderProjects() {
