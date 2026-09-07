@@ -187,16 +187,30 @@
     };
   }
 
+  function inferredInactiveFrom(project) {
+    if (project.inactiveFrom) return project.inactiveFrom;
+    if (project.status !== "churned") return "";
+
+    const months = state.snapshots
+      .filter(s => s.projectId === project.id)
+      .map(s => s.month)
+      .filter(Boolean)
+      .sort();
+
+    return months.length ? shiftMonth(months[months.length - 1], 1) : currentMonth;
+  }
+
   function activeForMonth(project, month) {
-    if (project.startMonth && project.startMonth > month) return false;
-    if (project.inactiveFrom && month >= project.inactiveFrom) return false;
+    if (project.startMonth && month < project.startMonth) return false;
 
-    if (project.status === "churned") {
-      if (project.inactiveFrom) return month < project.inactiveFrom;
-      return state.snapshots.some(s => s.projectId === project.id && s.month === month);
-    }
+    const inactiveFrom = inferredInactiveFrom(project);
+    if (inactiveFrom && month >= inactiveFrom) return false;
 
-    return project.status === "active";
+    // Current lifecycle status must never erase historical months.
+    // A pause without an explicit pause date only affects current/future months.
+    if (project.status === "paused" && month >= currentMonth) return false;
+
+    return true;
   }
 
   function rowsForMonth(month) {
@@ -208,7 +222,7 @@
       .filter(p => activeForMonth(p, month))
       .map(p => {
         const saved = snapshotByProject.get(p.id);
-        if (saved?.manualOverride) return saved;
+        if (saved?.manualOverride || saved?.lifecycleArchived) return saved;
         return projectToRow(p, saved?.paymentStatus || "paid", month);
       });
   }
@@ -775,6 +789,38 @@
     );
   }
 
+  function archiveProjectHistory(project, inactiveFrom) {
+    if (!project || !inactiveFrom) return;
+
+    const firstMonth = project.startMonth || inactiveFrom;
+    const lastActiveMonth = shiftMonth(inactiveFrom, -1);
+    if (firstMonth > lastActiveMonth) return;
+
+    let month = firstMonth;
+    let guard = 0;
+
+    while (month <= lastActiveMonth && guard < 240) {
+      const idx = state.snapshots.findIndex(s => s.month === month && s.projectId === project.id);
+
+      if (idx >= 0) {
+        state.snapshots[idx] = {
+          ...state.snapshots[idx],
+          lifecycleArchived: true
+        };
+      } else {
+        state.snapshots.push({
+          ...projectToRow(project, "paid", month),
+          id: uid("snap"),
+          manualOverride: false,
+          lifecycleArchived: true
+        });
+      }
+
+      month = shiftMonth(month, 1);
+      guard += 1;
+    }
+  }
+
   function openEndCollaborationModal() {
     const projectId=$("#projectId").value;
     const project=state.projects.find(p=>p.id===projectId);
@@ -801,6 +847,9 @@
     if(!project)return;
     const mode=$('input[name="endCollaborationMode"]:checked')?.value||"after";
     const inactiveFrom=mode==="from"?selectedMonth:shiftMonth(selectedMonth,1);
+
+    // Freeze every historical active month BEFORE changing lifecycle state.
+    archiveProjectHistory(project, inactiveFrom);
 
     project.inactiveFrom=inactiveFrom;
     project.status="churned";
