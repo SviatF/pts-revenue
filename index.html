@@ -29,6 +29,9 @@
         <button class="nav-item" data-view="team">
           <span class="nav-icon">◇</span><span>Team</span>
         </button>
+        <button class="nav-item" data-view="compensation">
+          <span class="nav-icon">◎</span><span>Compensation</span>
+        </button>
         <button class="nav-item" data-view="analytics">
           <span class="nav-icon">⌁</span><span>Analytics</span>
         </button>
@@ -272,6 +275,51 @@
         </article>
       </section>
 
+      <section class="view" id="view-compensation">
+        <div class="section-toolbar">
+          <div class="toolbar-copy">
+            <span class="eyebrow">COMPENSATION</span>
+            <h2>Rates & salary control</h2>
+            <p>Edit default project rates or correct the exact numbers for the selected month.</p>
+          </div>
+        </div>
+
+        <div class="project-summary-grid">
+          <article class="mini-stat"><span>Total payroll</span><strong id="compPayroll">$0</strong></article>
+          <article class="mini-stat"><span>Targetologists</span><strong id="compTarget">$0</strong></article>
+          <article class="mini-stat"><span>Performance</span><strong id="compPerformance">$0</strong></article>
+          <article class="mini-stat"><span>Lead managers</span><strong id="compLead">$0</strong></article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <span class="panel-kicker">SELECTED MONTH</span>
+              <h2 id="compensationMonthTitle">—</h2>
+            </div>
+            <span class="muted">Default settings + monthly overrides</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Revenue</th>
+                  <th>Target rate</th>
+                  <th>Performance</th>
+                  <th>Lead</th>
+                  <th>Payroll</th>
+                  <th>Agency net</th>
+                  <th>Source</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="compensationTable"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
       <section class="view" id="view-analytics">
         <div class="section-toolbar">
           <div class="toolbar-copy">
@@ -414,6 +462,80 @@
           <div class="spacer"></div>
           <button type="button" class="btn btn-ghost" data-close-project>Cancel</button>
           <button type="submit" class="btn btn-primary">Save project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="adjustmentModal" hidden>
+    <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="adjustmentModalTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">MONTHLY OVERRIDE</span>
+          <h2 id="adjustmentModalTitle">Adjust month</h2>
+        </div>
+        <button class="icon-btn" data-close-adjustment aria-label="Закрити">×</button>
+      </div>
+
+      <form id="adjustmentForm">
+        <input type="hidden" id="adjustProjectId" />
+        <div class="project-form-layout">
+          <div class="form-fields">
+            <div class="adjustment-context">
+              <div><span>Project</span><strong id="adjustProjectName">—</strong></div>
+              <div><span>Month</span><strong id="adjustMonthName">—</strong></div>
+            </div>
+            <label>
+              <span>Revenue for this month, $</span>
+              <input id="adjustRevenue" type="number" min="0" step="0.01" required />
+            </label>
+            <div class="form-row">
+              <label>
+                <span>Targetologist rate, $</span>
+                <input id="adjustTargetSalary" type="number" min="0" step="0.01" required />
+              </label>
+              <label>
+                <span>Performance, %</span>
+                <input id="adjustPerformancePct" type="number" min="0" max="100" step="0.01" required />
+              </label>
+            </div>
+            <label>
+              <span>Lead manager, % of full check</span>
+              <input id="adjustLeadPct" type="number" min="0" max="100" step="0.01" required />
+            </label>
+            <label>
+              <span>Payment status</span>
+              <select id="adjustPaymentStatus">
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </label>
+            <p class="form-help">This changes only the selected month. The project's default rates remain untouched.</p>
+          </div>
+
+          <aside class="live-model">
+            <span class="panel-kicker">MONTHLY MODEL</span>
+            <div class="model-main">
+              <span>Agency net</span>
+              <strong id="adjustModelNet">$0</strong>
+              <em id="adjustModelMargin">0% margin</em>
+            </div>
+            <div class="model-lines">
+              <div><span>Revenue</span><strong id="adjustModelRevenue">$0</strong></div>
+              <div><span>Targetologist</span><strong id="adjustModelTarget">−$0</strong></div>
+              <div><span>Performance</span><strong id="adjustModelPerformance">−$0</strong></div>
+              <div><span>Lead manager</span><strong id="adjustModelLead">−$0</strong></div>
+              <div class="model-total"><span>Total payroll</span><strong id="adjustModelPayroll">$0</strong></div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="removeAdjustmentBtn" hidden>Remove override</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn btn-ghost" data-close-adjustment>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save month correction</button>
         </div>
       </form>
     </div>
