@@ -123,12 +123,17 @@
 
   function rowsForMonth(month) {
     const snaps = state.snapshots.filter(s => s.month === month);
-    if (state.closedMonths.includes(month) || snaps.length) return snaps;
-    return state.projects.filter(p => activeForMonth(p, month) && p.status === "active").map(p => {
-      const row = projectToRow(p);
-      row.month = month;
-      return row;
-    });
+    if (state.closedMonths.includes(month)) return snaps;
+
+    const snapshotByProject = new Map(snaps.map(s => [s.projectId, s]));
+    return state.projects
+      .filter(p => activeForMonth(p, month) && p.status === "active")
+      .map(p => {
+        const saved = snapshotByProject.get(p.id);
+        const row = projectToRow(p, saved?.paymentStatus || "paid");
+        row.month = month;
+        return row;
+      });
   }
 
   function metrics(rows) {
@@ -293,7 +298,10 @@
     $("#kpiRevenueChange").innerHTML = changeHtml(change(m.revenue, prev.revenue));
     $("#kpiNetChange").innerHTML = changeHtml(change(m.net, prev.net));
     $("#kpiPayrollRatio").textContent = pct(m.revenue ? m.payroll / m.revenue * 100 : 0) + " of revenue";
-    $("#kpiMarginChange").innerHTML = changeHtml(prev.revenue ? m.margin - prev.margin : null, " pts vs previous month");
+    const marginDelta = prev.revenue ? m.margin - prev.margin : null;
+    $("#kpiMarginChange").innerHTML = marginDelta === null
+      ? "No previous month data"
+      : '<span class="' + (marginDelta >= 0 ? "positive" : "negative") + '">' + (marginDelta >= 0 ? "+" : "") + marginDelta.toFixed(1) + ' pts</span> vs previous month';
     $("#collectedRevenue").textContent = money.format(m.collected);
 
     const months = Array.from({ length: 12 }, (_, i) => shiftMonth(selectedMonth, i - 11));
