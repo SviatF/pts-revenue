@@ -189,10 +189,14 @@
 
   function activeForMonth(project, month) {
     if (project.startMonth && project.startMonth > month) return false;
+    if (project.inactiveFrom && month >= project.inactiveFrom) return false;
+
     if (project.status === "churned") {
+      if (project.inactiveFrom) return month < project.inactiveFrom;
       return state.snapshots.some(s => s.projectId === project.id && s.month === month);
     }
-    return project.status === "active" || project.status === "paused";
+
+    return project.status === "active";
   }
 
   function rowsForMonth(month) {
@@ -201,7 +205,7 @@
 
     const snapshotByProject = new Map(snaps.map(s => [s.projectId, s]));
     return state.projects
-      .filter(p => activeForMonth(p, month) && p.status === "active")
+      .filter(p => activeForMonth(p, month))
       .map(p => {
         const saved = snapshotByProject.get(p.id);
         if (saved?.manualOverride) return saved;
@@ -275,7 +279,7 @@
 
   function snapshotMonth(month) {
     const existing = state.snapshots.filter(s => s.month !== month);
-    const liveRows = state.projects.filter(p => p.status === "active" && (!p.startMonth || p.startMonth <= month)).map(p => {
+    const liveRows = state.projects.filter(p => activeForMonth(p, month)).map(p => {
       const old = state.snapshots.find(s => s.month === month && s.projectId === p.id);
       if (old?.manualOverride) return { ...old };
       const row = projectToRow(p, old?.paymentStatus || "paid", month);
@@ -475,7 +479,13 @@
             return '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(item.salary) + ' · fixed</span></div>';
           }).join("") + '<div class="target-total-line">Total ' + money.format(targetSalary) + '</div></div>'
         : '<div class="project-role-person"><strong>Unassigned</strong><span>' + money.format(0) + '</span></div>';
-      return '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(p.name)) + '</span><div><strong>' + esc(p.name) + '</strong><br><span class="status-pill ' + esc(p.status) + '">' + esc(p.status) + '</span></div></div></td><td><strong>' + money.format(e.revenue) + '</strong></td><td>' + targetCell + '</td><td>' + roleCell(performance,e.performanceSalary,pct(e.performancePct)) + '</td><td>' + roleCell(lead,e.leadSalary,pct(e.leadPct)) + '</td><td>' + money.format(e.totalPayroll) + '</td><td><strong>' + money.format(e.agencyNet) + '</strong></td><td>' + pct(e.margin) + '</td><td><div class="row-actions"><button class="small-icon-btn" data-edit-project="' + p.id + '" aria-label="Edit">···</button></div></td></tr>';
+      const ended = Boolean(p.inactiveFrom && selectedMonth >= p.inactiveFrom);
+      const ending = Boolean(p.inactiveFrom && selectedMonth < p.inactiveFrom);
+      const statusLabel = ended ? "ended" : (ending ? "ending" : p.status);
+      const statusSub = p.inactiveFrom
+        ? '<span class="project-end-note">' + (ended ? 'Ended from ' : 'Ends from ') + esc(monthLabel(p.inactiveFrom)) + '</span>'
+        : '';
+      return '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(p.name)) + '</span><div><strong>' + esc(p.name) + '</strong><br><span class="status-pill ' + esc(statusLabel) + '">' + esc(statusLabel) + '</span>' + statusSub + '</div></div></td><td><strong>' + money.format(e.revenue) + '</strong></td><td>' + targetCell + '</td><td>' + roleCell(performance,e.performanceSalary,pct(e.performancePct)) + '</td><td>' + roleCell(lead,e.leadSalary,pct(e.leadPct)) + '</td><td>' + money.format(e.totalPayroll) + '</td><td><strong>' + money.format(e.agencyNet) + '</strong></td><td>' + pct(e.margin) + '</td><td><div class="row-actions"><button class="small-icon-btn" data-edit-project="' + p.id + '" aria-label="Edit">···</button></div></td></tr>';
     }).join("");
   }
 
@@ -652,6 +662,14 @@
     $("#performancePct").value=p ? n(terms.performancePct) : "";
     $("#leadPct").value=p ? n(terms.leadPct) : "";
     $("#projectStatus").value=p?.status||"active";
+    $("#endCollaborationBtn").hidden=!p;
+    if(p?.inactiveFrom){
+      $("#endCollaborationBtn").textContent="Collaboration ended";
+      $("#endCollaborationBtn").disabled=true;
+    }else{
+      $("#endCollaborationBtn").textContent="End collaboration";
+      $("#endCollaborationBtn").disabled=false;
+    }
     $("#projectStartMonth").value=p?.startMonth||selectedMonth;
     populateAssignmentSelects(p ? terms : {});
     const effectiveMonth = p
@@ -738,13 +756,67 @@
   function deleteProject() {
     const id=$("#projectId").value;if(!id)return;
     const p=state.projects.find(x=>x.id===id);
-    showConfirm("Delete project?","Historical closed-month snapshots will stay intact, but the active project will be removed.",()=>{
-      state.projects=state.projects.filter(x=>x.id!==id);
-      saveState();closeProjectModal();hideConfirm();render();showToast((p?.name||"Project")+" deleted");
-    },"Delete");
+    showConfirm(
+      "Delete project permanently?",
+      "This fully deletes the project, its monthly settings and all historical snapshots. Use End collaboration if you want to keep history.",
+      ()=>{
+        state.projects=state.projects.filter(x=>x.id!==id);
+        state.monthlySettings=state.monthlySettings.filter(x=>x.projectId!==id);
+        state.snapshots=state.snapshots.filter(x=>x.projectId!==id);
+        saveState();
+        closeProjectModal();
+        hideConfirm();
+        render();
+        showToast((p?.name||"Project")+" permanently deleted");
+      },
+      "Delete permanently"
+    );
   }
 
-    function openAdjustmentModal(projectId) {
+  function openEndCollaborationModal() {
+    const projectId=$("#projectId").value;
+    const project=state.projects.find(p=>p.id===projectId);
+    if(!project)return;
+    if(project.startMonth && selectedMonth < project.startMonth){
+      showToast("Select a month from the project start date or later");
+      return;
+    }
+    $("#endCollaborationProjectId").value=projectId;
+    $("#endCollaborationTitle").textContent="End collaboration · "+project.name;
+    $("#endCollaborationMonth").textContent=monthLabel(selectedMonth);
+    $$('input[name="endCollaborationMode"]').forEach(r=>r.checked=r.value==="after");
+    $$(".end-option").forEach(opt=>opt.classList.toggle("selected",$('input',opt)?.checked));
+    $("#endCollaborationModal").hidden=false;
+  }
+
+  function closeEndCollaborationModal(){
+    $("#endCollaborationModal").hidden=true;
+  }
+
+  function confirmEndCollaboration(){
+    const projectId=$("#endCollaborationProjectId").value;
+    const project=state.projects.find(p=>p.id===projectId);
+    if(!project)return;
+    const mode=$('input[name="endCollaborationMode"]:checked')?.value||"after";
+    const inactiveFrom=mode==="from"?selectedMonth:shiftMonth(selectedMonth,1);
+
+    project.inactiveFrom=inactiveFrom;
+    project.status="churned";
+    project.endedAt=new Date().toISOString();
+    project.updatedAt=new Date().toISOString();
+
+    saveState();
+    closeEndCollaborationModal();
+    closeProjectModal();
+    render();
+    showToast(
+      mode==="from"
+        ? project.name+" ended from "+monthLabel(selectedMonth)
+        : project.name+" ends after "+monthLabel(selectedMonth)
+    );
+  }
+
+  function openAdjustmentModal(projectId) {
     const row = rowsForMonth(selectedMonth).find(r => r.projectId === projectId);
     const project = state.projects.find(p => p.id === projectId);
     if (!row && !project) return;
@@ -1042,6 +1114,12 @@
     }
   });
   $("#deleteProjectBtn").addEventListener("click",deleteProject);
+  $("#endCollaborationBtn").addEventListener("click",openEndCollaborationModal);
+  $("#confirmEndCollaborationBtn").addEventListener("click",confirmEndCollaboration);
+  $("[data-close-end-collaboration]").forEach(x=>x.addEventListener("click",closeEndCollaborationModal));
+  $('input[name="endCollaborationMode"]').forEach(r=>r.addEventListener("change",()=>{
+    $(".end-option").forEach(opt=>opt.classList.toggle("selected",$('input',opt)?.checked));
+  }));
   $("#projectStatusFilter").addEventListener("change",renderProjects);
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
   document.querySelectorAll("[data-close-adjustment]").forEach(x=>x.addEventListener("click",closeAdjustmentModal));
@@ -1062,6 +1140,7 @@
   $("#projectModal").addEventListener("click",e=>{if(e.target===$("#projectModal"))closeProjectModal();});
   $("#memberModal").addEventListener("click",e=>{if(e.target===$("#memberModal"))closeMemberModal();});
   $("#adjustmentModal").addEventListener("click",e=>{if(e.target===$("#adjustmentModal"))closeAdjustmentModal();});
+  $("#endCollaborationModal").addEventListener("click",e=>{if(e.target===$("#endCollaborationModal"))closeEndCollaborationModal();});
   $("#confirmDialog").addEventListener("click",e=>{if(e.target===$("#confirmDialog"))hideConfirm();});
 
   document.addEventListener("click",e=>{
@@ -1095,7 +1174,7 @@
   });
 
   document.addEventListener("keydown",e=>{
-    if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
+    if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeEndCollaborationModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
   });
 
   render();
