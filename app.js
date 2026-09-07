@@ -524,6 +524,133 @@
     },"Delete");
   }
 
+  function openAdjustmentModal(projectId) {
+    const row = rowsForMonth(selectedMonth).find(r => r.projectId === projectId);
+    const project = state.projects.find(p => p.id === projectId);
+    if (!row && !project) return;
+
+    const source = row || projectToRow(project);
+    $("#adjustmentModal").hidden = false;
+    $("#adjustProjectId").value = projectId;
+    $("#adjustProjectName").textContent = source.projectName || project?.name || "Project";
+    $("#adjustMonthName").textContent = monthLabel(selectedMonth);
+    $("#adjustRevenue").value = n(source.revenue);
+    $("#adjustTargetSalary").value = n(source.targetSalary);
+    $("#adjustPerformancePct").value = n(source.performancePct);
+    $("#adjustLeadPct").value = n(source.leadPct);
+    $("#adjustPaymentStatus").value = source.paymentStatus || "paid";
+
+    const saved = state.snapshots.find(s => s.month === selectedMonth && s.projectId === projectId);
+    $("#removeAdjustmentBtn").hidden = !saved?.manualOverride;
+    updateAdjustmentLiveModel();
+  }
+
+  function closeAdjustmentModal() {
+    $("#adjustmentModal").hidden = true;
+  }
+
+  function updateAdjustmentLiveModel() {
+    const e = computeEconomics(
+      $("#adjustRevenue").value,
+      $("#adjustTargetSalary").value,
+      $("#adjustPerformancePct").value,
+      $("#adjustLeadPct").value
+    );
+    $("#adjustModelRevenue").textContent = money2.format(e.revenue);
+    $("#adjustModelTarget").textContent = "−" + money2.format(e.targetSalary);
+    $("#adjustModelPerformance").textContent = "−" + money2.format(e.performanceSalary);
+    $("#adjustModelLead").textContent = "−" + money2.format(e.leadSalary);
+    $("#adjustModelPayroll").textContent = money2.format(e.totalPayroll);
+    $("#adjustModelNet").textContent = money2.format(e.agencyNet);
+    $("#adjustModelMargin").textContent = pct(e.margin) + " margin";
+  }
+
+  function submitAdjustment(ev) {
+    ev.preventDefault();
+    const projectId = $("#adjustProjectId").value;
+    const project = state.projects.find(p => p.id === projectId);
+    const currentRow = rowsForMonth(selectedMonth).find(r => r.projectId === projectId);
+    if (!projectId || (!project && !currentRow)) return;
+
+    const e = computeEconomics(
+      $("#adjustRevenue").value,
+      $("#adjustTargetSalary").value,
+      $("#adjustPerformancePct").value,
+      $("#adjustLeadPct").value
+    );
+
+    const idx = state.snapshots.findIndex(s => s.month === selectedMonth && s.projectId === projectId);
+    const existing = idx >= 0 ? state.snapshots[idx] : null;
+
+    let baseline = existing?.baseline || null;
+    if (existing && !existing.manualOverride && !baseline) {
+      baseline = {
+        revenue: existing.revenue,
+        targetSalary: existing.targetSalary,
+        performancePct: existing.performancePct,
+        performanceBase: existing.performanceBase,
+        performanceSalary: existing.performanceSalary,
+        leadPct: existing.leadPct,
+        leadSalary: existing.leadSalary,
+        totalPayroll: existing.totalPayroll,
+        agencyNet: existing.agencyNet,
+        margin: existing.margin,
+        paymentStatus: existing.paymentStatus
+      };
+    }
+
+    const override = {
+      id: existing?.id || uid("snap"),
+      month: selectedMonth,
+      projectId,
+      projectName: currentRow?.projectName || project?.name || "Project",
+      paymentStatus: $("#adjustPaymentStatus").value,
+      targetologistId: currentRow?.targetologistId || project?.targetologistId || "",
+      performanceId: currentRow?.performanceId || project?.performanceId || "",
+      leadManagerId: currentRow?.leadManagerId || project?.leadManagerId || "",
+      manualOverride: true,
+      baseline,
+      ...e
+    };
+
+    if (idx >= 0) state.snapshots[idx] = override;
+    else state.snapshots.push(override);
+
+    saveState();
+    closeAdjustmentModal();
+    render();
+    showToast("Monthly correction saved");
+  }
+
+  function removeAdjustment() {
+    const projectId = $("#adjustProjectId").value;
+    const idx = state.snapshots.findIndex(s => s.month === selectedMonth && s.projectId === projectId);
+    if (idx < 0) return;
+    const snap = state.snapshots[idx];
+
+    showConfirm("Remove monthly override?", "The selected month will return to its original/default calculation.", () => {
+      if (state.closedMonths.includes(selectedMonth) && snap.baseline) {
+        state.snapshots[idx] = {
+          ...snap,
+          ...snap.baseline,
+          manualOverride: false,
+          baseline: null
+        };
+      } else if (state.closedMonths.includes(selectedMonth)) {
+        state.snapshots[idx].manualOverride = false;
+        state.snapshots[idx].baseline = null;
+      } else {
+        state.snapshots[idx].manualOverride = false;
+        state.snapshots[idx].baseline = null;
+      }
+      saveState();
+      hideConfirm();
+      closeAdjustmentModal();
+      render();
+      showToast("Monthly override removed");
+    }, "Remove");
+  }
+
   function openMemberModal(id=""){
     const m=state.team.find(x=>x.id===id);
     $("#memberModal").hidden=false;
@@ -621,6 +748,10 @@
   $("#deleteProjectBtn").addEventListener("click",deleteProject);
   $("#projectStatusFilter").addEventListener("change",renderProjects);
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
+  $("[data-close-adjustment]").forEach(x=>x.addEventListener("click",closeAdjustmentModal));
+  $("#adjustmentForm").addEventListener("submit",submitAdjustment);
+  ["#adjustRevenue","#adjustTargetSalary","#adjustPerformancePct","#adjustLeadPct"].forEach(s=>$(s).addEventListener("input",updateAdjustmentLiveModel));
+  $("#removeAdjustmentBtn").addEventListener("click",removeAdjustment);
   $$("[data-close-member]").forEach(x=>x.addEventListener("click",closeMemberModal));
   $("#memberForm").addEventListener("submit",submitMember);
   $("#deleteMemberBtn").addEventListener("click",deleteMember);
@@ -631,11 +762,16 @@
   $("#confirmOk").addEventListener("click",()=>{if(confirmAction)confirmAction();});
   $("#projectModal").addEventListener("click",e=>{if(e.target===$("#projectModal"))closeProjectModal();});
   $("#memberModal").addEventListener("click",e=>{if(e.target===$("#memberModal"))closeMemberModal();});
+  $("#adjustmentModal").addEventListener("click",e=>{if(e.target===$("#adjustmentModal"))closeAdjustmentModal();});
   $("#confirmDialog").addEventListener("click",e=>{if(e.target===$("#confirmDialog"))hideConfirm();});
 
   document.addEventListener("click",e=>{
     const editProject=e.target.closest("[data-edit-project]");
     if(editProject){openProjectModal(editProject.dataset.editProject);return;}
+    const editDefault=e.target.closest("[data-edit-default]");
+    if(editDefault){openProjectModal(editDefault.dataset.editDefault);return;}
+    const adjustProject=e.target.closest("[data-adjust-project]");
+    if(adjustProject){openAdjustmentModal(adjustProject.dataset.adjustProject);return;}
     const editMember=e.target.closest("[data-edit-member]");
     if(editMember){e.stopPropagation();openMemberModal(editMember.dataset.editMember);return;}
     const memberCard=e.target.closest("[data-member-card]");
@@ -648,7 +784,7 @@
   });
 
   document.addEventListener("keydown",e=>{
-    if(e.key==="Escape"){closeProjectModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
+    if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
   });
 
   render();
