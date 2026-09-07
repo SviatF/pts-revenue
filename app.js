@@ -602,6 +602,89 @@
     $("#forecastMargin").textContent = pct(m.margin);
   }
 
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+  function animateNumberElement(el, duration = 620) {
+    if (!el || reduceMotion) return;
+    const raw = el.textContent.trim();
+    if (!raw || raw === "—") return;
+
+    const isMoney = raw.includes("$");
+    const isPercent = raw.includes("%");
+    const numeric = Number(raw.replace(/[^0-9.-]/g, ""));
+    if (!Number.isFinite(numeric)) return;
+
+    const decimals = isPercent && Math.abs(numeric % 1) > 0 ? 1 : 0;
+    const startAt = performance.now();
+    el.classList.add("fx-number");
+
+    const step = now => {
+      const t = Math.min(1, (now - startAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const value = numeric * eased;
+
+      if (isMoney) {
+        el.textContent = money.format(value);
+      } else if (isPercent) {
+        el.textContent = value.toFixed(decimals) + "%";
+      } else {
+        el.textContent = Math.round(value).toLocaleString("en-US");
+      }
+
+      if (t < 1) requestAnimationFrame(step);
+      else el.textContent = raw;
+    };
+
+    requestAnimationFrame(step);
+  }
+
+  function animateCurrentView() {
+    if (reduceMotion) return;
+    const view = $(".view.active");
+    if (!view) return;
+
+    const cards = [
+      ...$$(".kpi-card", view),
+      ...$$(".panel", view),
+      ...$$(".mini-stat", view),
+      ...$$(".team-card", view),
+      ...$$(".role-team-block", view),
+      ...$$(".side-metric", view)
+    ];
+
+    cards.slice(0, 30).forEach((el, i) => {
+      el.classList.remove("fx-enter");
+      void el.offsetWidth;
+      el.style.setProperty("--fx-delay", Math.min(i * 34, 420) + "ms");
+      el.classList.add("fx-enter");
+    });
+
+    $$(".data-table tbody tr", view).slice(0, 28).forEach((row, i) => {
+      row.classList.remove("fx-row-enter");
+      void row.offsetWidth;
+      row.style.setProperty("--fx-delay", Math.min(i * 24, 420) + "ms");
+      row.classList.add("fx-row-enter");
+    });
+
+    const numberIds = [
+      "kpiRevenue","kpiNet","kpiPayroll","kpiMargin","kpiProjects","kpiAvg",
+      "projectMrr","projectNet","projectMargin","projectCount",
+      "compPayroll","compTarget","compPerformance","compLead",
+      "forecastMrr","forecastRevenue","forecastNet","forecastMargin",
+      "sideTeamPayroll","sideAvgSalary","sideMargin","sideRunRate",
+      "employeeSalary","employeeProjectsCount","employeeRevenue"
+    ];
+    numberIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && view.contains(el)) animateNumberElement(el);
+    });
+  }
+
+  function scheduleMotion() {
+    if (reduceMotion) return;
+    requestAnimationFrame(() => requestAnimationFrame(animateCurrentView));
+  }
+
   function render() {
     $("#monthPicker").value = selectedMonth;
     if (currentView === "overview") renderOverview();
@@ -609,6 +692,7 @@
     if (currentView === "team") renderTeam();
     if (currentView === "compensation") renderCompensation();
     if (currentView === "analytics") renderAnalytics();
+    scheduleMotion();
   }
 
   function targetologistOptions(selectedId = "") {
@@ -1226,6 +1310,43 @@
 
   document.addEventListener("keydown",e=>{
     if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeEndCollaborationModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
+  });
+
+  if (!reduceMotion) {
+    let pointerFrame = 0;
+    let pointerX = window.innerWidth / 2;
+    let pointerY = window.innerHeight / 2;
+
+    window.addEventListener("pointermove", e => {
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      if (pointerFrame) return;
+      pointerFrame = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty("--mouse-x", pointerX + "px");
+        document.documentElement.style.setProperty("--mouse-y", pointerY + "px");
+        pointerFrame = 0;
+      });
+    }, { passive:true });
+  }
+
+  document.addEventListener("keydown", e => {
+    const search = $("#globalSearch");
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      search?.focus();
+      search?.select();
+    }
+    if (e.key === "Escape" && document.activeElement === search) search?.blur();
+  });
+
+  $("#globalSearch")?.addEventListener("input", e => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) return;
+    const project = state.projects.find(p => p.name.toLowerCase().includes(q));
+    const member = state.team.find(m => m.name.toLowerCase().includes(q));
+    if (project) e.target.style.boxShadow = "0 0 0 1px rgba(255,47,146,.32),0 0 24px rgba(255,47,146,.1)";
+    else if (member) e.target.style.boxShadow = "0 0 0 1px rgba(24,242,141,.28),0 0 24px rgba(24,242,141,.08)";
+    else e.target.style.boxShadow = "";
   });
 
   render();
