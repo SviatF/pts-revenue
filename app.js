@@ -130,6 +130,7 @@
       .filter(p => activeForMonth(p, month) && p.status === "active")
       .map(p => {
         const saved = snapshotByProject.get(p.id);
+        if (saved?.manualOverride) return saved;
         const row = projectToRow(p, saved?.paymentStatus || "paid");
         row.month = month;
         return row;
@@ -188,12 +189,14 @@
   function snapshotMonth(month) {
     const existing = state.snapshots.filter(s => s.month !== month);
     const liveRows = state.projects.filter(p => p.status === "active" && (!p.startMonth || p.startMonth <= month)).map(p => {
-      const e = computeEconomics(p.monthlyFee, p.targetSalary, p.performancePct, p.leadPct);
       const old = state.snapshots.find(s => s.month === month && s.projectId === p.id);
+      if (old?.manualOverride) return { ...old };
+      const e = computeEconomics(p.monthlyFee, p.targetSalary, p.performancePct, p.leadPct);
       return {
         id: old?.id || uid("snap"), month, projectId: p.id, projectName: p.name,
         paymentStatus: old?.paymentStatus || "paid",
         targetologistId: p.targetologistId || "", performanceId: p.performanceId || "", leadManagerId: p.leadManagerId || "",
+        manualOverride: false,
         ...e
       };
     });
@@ -241,7 +244,7 @@
     currentView = view;
     $$(".view").forEach(x => x.classList.toggle("active", x.id === "view-" + view));
     $$(".nav-item[data-view]").forEach(x => x.classList.toggle("active", x.dataset.view === view));
-    const titles = { overview: "Overview", projects: "Projects", team: "Team", analytics: "Analytics" };
+    const titles = { overview: "Overview", projects: "Projects", team: "Team", compensation: "Compensation", analytics: "Analytics" };
     $("#pageTitle").textContent = titles[view] || "PTS Finance";
     $("#sidebar").classList.remove("open");
     render();
@@ -383,6 +386,24 @@
     $("#employeeProjectRows").innerHTML = stats.assigned.length ? stats.assigned.map(x => '<tr><td><strong>' + esc(x.row.projectName) + '</strong></td><td>' + esc(x.roles.join(", ")) + '</td><td><strong>' + money.format(x.salary) + '</strong></td><td>' + money.format(x.row.revenue) + "</td></tr>").join("") : '<tr><td colspan="4" class="muted">No assigned projects in this month.</td></tr>';
   }
 
+  function renderCompensation() {
+    const rows = rowsForMonth(selectedMonth);
+    const m = metrics(rows);
+    $("#compensationMonthTitle").textContent = monthLabel(selectedMonth);
+    $("#compPayroll").textContent = money.format(m.payroll);
+    $("#compTarget").textContent = money.format(m.target);
+    $("#compPerformance").textContent = money.format(m.performance);
+    $("#compLead").textContent = money.format(m.lead);
+
+    $("#compensationTable").innerHTML = rows.length ? rows.map(r => {
+      const project = state.projects.find(p => p.id === r.projectId);
+      const saved = state.snapshots.find(s => s.month === selectedMonth && s.projectId === r.projectId);
+      const source = saved?.manualOverride ? "Monthly override" : (state.closedMonths.includes(selectedMonth) ? "Closed snapshot" : "Default rates");
+      const sourceClass = saved?.manualOverride ? "positive" : "muted";
+      return '<tr><td><strong>' + esc(r.projectName) + '</strong></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.targetSalary) + '</td><td>' + pct(r.performancePct) + ' <span class="muted">(' + money.format(r.performanceSalary) + ')</span></td><td>' + pct(r.leadPct) + ' <span class="muted">(' + money.format(r.leadSalary) + ')</span></td><td><strong>' + money.format(r.totalPayroll) + '</strong></td><td>' + money.format(r.agencyNet) + '</td><td><span class="' + sourceClass + '">' + source + '</span></td><td><div class="row-actions">' + (project ? '<button class="small-icon-btn rate-action" data-edit-default="' + esc(r.projectId) + '" title="Edit default project rates">Default</button>' : '') + '<button class="small-icon-btn rate-action" data-adjust-project="' + esc(r.projectId) + '" title="Correct selected month">Month</button></div></td></tr>';
+    }).join("") : '<tr><td colspan="9" class="muted">No project data in this month.</td></tr>';
+  }
+
   function renderAnalytics() {
     const rows = rowsForMonth(selectedMonth);
     const m = metrics(rows);
@@ -414,6 +435,7 @@
     if (currentView === "overview") renderOverview();
     if (currentView === "projects") renderProjects();
     if (currentView === "team") renderTeam();
+    if (currentView === "compensation") renderCompensation();
     if (currentView === "analytics") renderAnalytics();
   }
 
