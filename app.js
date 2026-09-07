@@ -99,13 +99,36 @@
     return { revenue, targetSalary, performancePct, performanceBase, performanceSalary, leadPct, leadSalary, totalPayroll, agencyNet, margin };
   }
 
+  function normalizeTargetologists(source = {}) {
+    const raw = Array.isArray(source.targetologists) ? source.targetologists : [];
+    let result = raw.map(item => ({
+      memberId: item?.memberId || item?.targetologistId || "",
+      salary: Math.max(0, n(item?.salary ?? item?.targetSalary))
+    })).filter(item => item.memberId || item.salary > 0);
+
+    if (!result.length && (source.targetologistId || n(source.targetSalary) > 0)) {
+      result = [{
+        memberId: source.targetologistId || "",
+        salary: Math.max(0, n(source.targetSalary))
+      }];
+    }
+    return result;
+  }
+
+  function totalTargetSalary(source = {}) {
+    return normalizeTargetologists(source).reduce((sum, item) => sum + n(item.salary), 0);
+  }
+
   function financeFields(source = {}) {
+    const targetologists = normalizeTargetologists(source);
+    const targetSalary = targetologists.reduce((sum, item) => sum + n(item.salary), 0);
     return {
       monthlyFee: n(source.monthlyFee),
-      targetSalary: n(source.targetSalary),
+      targetologists,
+      targetSalary,
+      targetologistId: targetologists[0]?.memberId || "",
       performancePct: n(source.performancePct),
       leadPct: n(source.leadPct),
-      targetologistId: source.targetologistId || "",
       performanceId: source.performanceId || "",
       leadManagerId: source.leadManagerId || ""
     };
@@ -146,14 +169,17 @@
 
   function projectToRow(project, paymentStatus = "paid", month = selectedMonth) {
     const terms = settingsForProjectMonth(project, month);
-    const e = computeEconomics(terms.monthlyFee, terms.targetSalary, terms.performancePct, terms.leadPct);
+    const targetologists = normalizeTargetologists(terms);
+    const targetSalary = targetologists.reduce((sum, item) => sum + n(item.salary), 0);
+    const e = computeEconomics(terms.monthlyFee, targetSalary, terms.performancePct, terms.leadPct);
     return {
       id: "live_" + project.id,
       projectId: project.id,
       projectName: project.name,
       month,
       paymentStatus,
-      targetologistId: terms.targetologistId || "",
+      targetologists,
+      targetologistId: targetologists[0]?.memberId || "",
       performanceId: terms.performanceId || "",
       leadManagerId: terms.leadManagerId || "",
       effectiveMonth: terms.effectiveMonth || project.startMonth || month,
@@ -218,9 +244,24 @@
   function salaryForMemberRow(row, memberId) {
     let salary = 0;
     const roles = [];
-    if (row.targetologistId === memberId) { salary += n(row.targetSalary); roles.push("Targetologist"); }
-    if (row.performanceId === memberId) { salary += n(row.performanceSalary); roles.push("Performance"); }
-    if (row.leadManagerId === memberId) { salary += n(row.leadSalary); roles.push("Lead manager"); }
+
+    const targets = normalizeTargetologists(row);
+    const targetSalaryForMember = targets
+      .filter(item => item.memberId === memberId)
+      .reduce((sum, item) => sum + n(item.salary), 0);
+    if (targets.some(item => item.memberId === memberId)) {
+      salary += targetSalaryForMember;
+      roles.push("Targetologist");
+    }
+
+    if (row.performanceId === memberId) {
+      salary += n(row.performanceSalary);
+      roles.push("Performance");
+    }
+    if (row.leadManagerId === memberId) {
+      salary += n(row.leadSalary);
+      roles.push("Lead manager");
+    }
     return { salary, roles };
   }
 
@@ -421,13 +462,20 @@
     $("#projectsEmpty").hidden = state.projects.length > 0;
     $("#projectsTable").innerHTML = projects.map(p => {
       const terms = settingsForProjectMonth(p, selectedMonth);
-      const e = computeEconomics(terms.monthlyFee,terms.targetSalary,terms.performancePct,terms.leadPct);
-      const target = getMember(terms.targetologistId);
+      const targetologists = normalizeTargetologists(terms);
+      const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
+      const e = computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
       const performance = getMember(terms.performanceId);
       const lead = getMember(terms.leadManagerId);
       const roleCell = (member, salary, detail = "") =>
         '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(salary) + (detail ? ' · ' + detail : '') + '</span></div>';
-      return '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(p.name)) + '</span><div><strong>' + esc(p.name) + '</strong><br><span class="status-pill ' + esc(p.status) + '">' + esc(p.status) + '</span></div></div></td><td><strong>' + money.format(e.revenue) + '</strong></td><td>' + roleCell(target,e.targetSalary,"fixed") + '</td><td>' + roleCell(performance,e.performanceSalary,pct(e.performancePct)) + '</td><td>' + roleCell(lead,e.leadSalary,pct(e.leadPct)) + '</td><td>' + money.format(e.totalPayroll) + '</td><td><strong>' + money.format(e.agencyNet) + '</strong></td><td>' + pct(e.margin) + '</td><td><div class="row-actions"><button class="small-icon-btn" data-edit-project="' + p.id + '" aria-label="Edit">···</button></div></td></tr>';
+      const targetCell = targetologists.length
+        ? '<div class="project-target-list">' + targetologists.map(item => {
+            const member = getMember(item.memberId);
+            return '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(item.salary) + ' · fixed</span></div>';
+          }).join("") + '<div class="target-total-line">Total ' + money.format(targetSalary) + '</div></div>'
+        : '<div class="project-role-person"><strong>Unassigned</strong><span>' + money.format(0) + '</span></div>';
+      return '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(p.name)) + '</span><div><strong>' + esc(p.name) + '</strong><br><span class="status-pill ' + esc(p.status) + '">' + esc(p.status) + '</span></div></div></td><td><strong>' + money.format(e.revenue) + '</strong></td><td>' + targetCell + '</td><td>' + roleCell(performance,e.performanceSalary,pct(e.performancePct)) + '</td><td>' + roleCell(lead,e.leadSalary,pct(e.leadPct)) + '</td><td>' + money.format(e.totalPayroll) + '</td><td><strong>' + money.format(e.agencyNet) + '</strong></td><td>' + pct(e.margin) + '</td><td><div class="row-actions"><button class="small-icon-btn" data-edit-project="' + p.id + '" aria-label="Edit">···</button></div></td></tr>';
     }).join("");
   }
 
@@ -498,7 +546,7 @@
       const saved = state.snapshots.find(s => s.month === selectedMonth && s.projectId === r.projectId);
       const source = saved?.manualOverride ? "Monthly override" : (state.closedMonths.includes(selectedMonth) ? "Closed snapshot" : "Default rates");
       const sourceClass = saved?.manualOverride ? "positive" : "muted";
-      return '<tr><td><strong>' + esc(r.projectName) + '</strong></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.targetSalary) + '</td><td>' + pct(r.performancePct) + ' <span class="muted">(' + money.format(r.performanceSalary) + ')</span></td><td>' + pct(r.leadPct) + ' <span class="muted">(' + money.format(r.leadSalary) + ')</span></td><td><strong>' + money.format(r.totalPayroll) + '</strong></td><td>' + money.format(r.agencyNet) + '</td><td><span class="' + sourceClass + '">' + source + '</span></td><td><div class="row-actions">' + (project ? '<button class="small-icon-btn rate-action" data-edit-default="' + esc(r.projectId) + '" title="Edit default project rates">Default</button>' : '') + '<button class="small-icon-btn rate-action" data-adjust-project="' + esc(r.projectId) + '" title="Correct selected month">Month</button></div></td></tr>';
+      return '<tr><td><strong>' + esc(r.projectName) + '</strong></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.targetSalary) + ' <span class="muted">· ' + normalizeTargetologists(r).length + ' ppl</span></td><td>' + pct(r.performancePct) + ' <span class="muted">(' + money.format(r.performanceSalary) + ')</span></td><td>' + pct(r.leadPct) + ' <span class="muted">(' + money.format(r.leadSalary) + ')</span></td><td><strong>' + money.format(r.totalPayroll) + '</strong></td><td>' + money.format(r.agencyNet) + '</td><td><span class="' + sourceClass + '">' + source + '</span></td><td><div class="row-actions">' + (project ? '<button class="small-icon-btn rate-action" data-edit-default="' + esc(r.projectId) + '" title="Edit default project rates">Default</button>' : '') + '<button class="small-icon-btn rate-action" data-adjust-project="' + esc(r.projectId) + '" title="Correct selected month">Month</button></div></td></tr>';
     }).join("") : '<tr><td colspan="9" class="muted">No project data in this month.</td></tr>';
   }
 
@@ -537,9 +585,50 @@
     if (currentView === "analytics") renderAnalytics();
   }
 
+  function targetologistOptions(selectedId = "") {
+    const members = state.team.filter(m => m.role === "targetologist" || m.id === selectedId);
+    return '<option value="">Unassigned</option>' + members.map(m =>
+      '<option value="' + m.id + '"' + (m.id === selectedId ? ' selected' : '') + '>' + esc(m.name) + '</option>'
+    ).join("");
+  }
+
+  function renderTargetologistRows(containerSelector, targetologists = [], scope = "project") {
+    const container = $(containerSelector);
+    if (!container) return;
+    const rows = targetologists.length ? targetologists : [{ memberId:"", salary:0 }];
+    container.innerHTML = rows.map((item,index) =>
+      '<div class="targetologist-assignment-row" data-target-scope="' + scope + '" data-target-index="' + index + '">' +
+        '<label><span>Person</span><select class="target-person-select">' + targetologistOptions(item.memberId) + '</select></label>' +
+        '<label><span>Fixed salary, $</span><input class="target-salary-input" type="number" min="0" step="0.01" value="' + n(item.salary) + '" placeholder="250" /></label>' +
+        '<button type="button" class="remove-targetologist-btn" data-remove-targetologist="' + scope + '" data-target-index="' + index + '" title="Remove targetologist" aria-label="Remove targetologist">×</button>' +
+      '</div>'
+    ).join("");
+  }
+
+  function readTargetologistRows(containerSelector) {
+    const container = $(containerSelector);
+    if (!container) return [];
+    return $$(".targetologist-assignment-row", container).map(row => ({
+      memberId: $(".target-person-select", row)?.value || "",
+      salary: Math.max(0, n($(".target-salary-input", row)?.value))
+    })).filter(item => item.memberId || item.salary > 0);
+  }
+
+  function addTargetologistRow(containerSelector, scope, preset = {}) {
+    const current = readTargetologistRows(containerSelector);
+    current.push({ memberId:preset.memberId || "", salary:n(preset.salary) });
+    renderTargetologistRows(containerSelector,current,scope);
+  }
+
+  function removeTargetologistRow(containerSelector, scope, index) {
+    const current = readTargetologistRows(containerSelector);
+    current.splice(Number(index),1);
+    renderTargetologistRows(containerSelector,current.length ? current : [{memberId:"",salary:0}],scope);
+  }
+
   function populateAssignmentSelects(project = {}) {
+    renderTargetologistRows("#targetologistRows", normalizeTargetologists(project), "project");
     const mapping = [
-      ["#targetologistId","targetologist",project.targetologistId],
       ["#performanceId","performance",project.performanceId],
       ["#leadManagerId","lead",project.leadManagerId]
     ];
@@ -559,7 +648,6 @@
     $("#projectId").value=p?.id||"";
     $("#projectName").value=p?.name||"";
     $("#projectRevenue").value=p ? n(terms.monthlyFee) : "";
-    $("#targetSalary").value=p ? n(terms.targetSalary) : "";
     $("#performancePct").value=p ? n(terms.performancePct) : "";
     $("#leadPct").value=p ? n(terms.leadPct) : "";
     $("#projectStatus").value=p?.status||"active";
@@ -580,7 +668,9 @@
   function closeProjectModal(){ $("#projectModal").hidden=true; }
 
   function updateLiveModel() {
-    const e=computeEconomics($("#projectRevenue").value,$("#targetSalary").value,$("#performancePct").value,$("#leadPct").value);
+    const targetologists = readTargetologistRows("#targetologistRows");
+    const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
+    const e=computeEconomics($("#projectRevenue").value,targetSalary,$("#performancePct").value,$("#leadPct").value);
     $("#modelRevenue").textContent=money2.format(e.revenue);
     $("#modelTarget").textContent="−"+money2.format(e.targetSalary);
     $("#modelPerformance").textContent="−"+money2.format(e.performanceSalary);
@@ -598,15 +688,14 @@
   function submitProject(ev) {
     ev.preventDefault();
     const id=$("#projectId").value;
-    const financials={
+    const financials=financeFields({
       monthlyFee:n($("#projectRevenue").value),
-      targetSalary:n($("#targetSalary").value),
+      targetologists:readTargetologistRows("#targetologistRows"),
       performancePct:n($("#performancePct").value),
       leadPct:n($("#leadPct").value),
-      targetologistId:$("#targetologistId").value,
       performanceId:$("#performanceId").value,
       leadManagerId:$("#leadManagerId").value
-    };
+    });
     const startMonth=$("#projectStartMonth").value||selectedMonth;
     const project={
       id:id||uid("prj"),
@@ -622,10 +711,8 @@
       const idx=state.projects.findIndex(x=>x.id===id);
       const previous=idx>=0?state.projects[idx]:null;
       if(previous) ensureProjectBaseline(previous);
-
       const effectiveMonth = selectedMonth < startMonth ? startMonth : selectedMonth;
       upsertProjectSettings(id,effectiveMonth,financials);
-
       if(idx>=0) state.projects[idx]={...state.projects[idx],...project};
       showToast("Terms saved from " + monthLabel(effectiveMonth) + " · earlier months preserved");
     }else{
@@ -646,7 +733,7 @@
     },"Delete");
   }
 
-  function openAdjustmentModal(projectId) {
+    function openAdjustmentModal(projectId) {
     const row = rowsForMonth(selectedMonth).find(r => r.projectId === projectId);
     const project = state.projects.find(p => p.id === projectId);
     if (!row && !project) return;
@@ -657,7 +744,7 @@
     $("#adjustProjectName").textContent = source.projectName || project?.name || "Project";
     $("#adjustMonthName").textContent = monthLabel(selectedMonth);
     $("#adjustRevenue").value = n(source.revenue);
-    $("#adjustTargetSalary").value = n(source.targetSalary);
+    renderTargetologistRows("#adjustTargetologistRows", normalizeTargetologists(source), "adjust");
     $("#adjustPerformancePct").value = n(source.performancePct);
     $("#adjustLeadPct").value = n(source.leadPct);
     $("#adjustPaymentStatus").value = source.paymentStatus || "paid";
@@ -672,12 +759,15 @@
   }
 
   function updateAdjustmentLiveModel() {
+    const targetologists = readTargetologistRows("#adjustTargetologistRows");
+    const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
     const e = computeEconomics(
       $("#adjustRevenue").value,
-      $("#adjustTargetSalary").value,
+      targetSalary,
       $("#adjustPerformancePct").value,
       $("#adjustLeadPct").value
     );
+    $("#adjustTargetSalaryPreview").textContent = money2.format(e.targetSalary);
     $("#adjustModelRevenue").textContent = money2.format(e.revenue);
     $("#adjustModelTarget").textContent = "−" + money2.format(e.targetSalary);
     $("#adjustModelPerformance").textContent = "−" + money2.format(e.performanceSalary);
@@ -694,9 +784,11 @@
     const currentRow = rowsForMonth(selectedMonth).find(r => r.projectId === projectId);
     if (!projectId || (!project && !currentRow)) return;
 
+    const targetologists = readTargetologistRows("#adjustTargetologistRows");
+    const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
     const e = computeEconomics(
       $("#adjustRevenue").value,
-      $("#adjustTargetSalary").value,
+      targetSalary,
       $("#adjustPerformancePct").value,
       $("#adjustLeadPct").value
     );
@@ -708,7 +800,9 @@
     if (existing && !existing.manualOverride && !baseline) {
       baseline = {
         revenue: existing.revenue,
+        targetologists: normalizeTargetologists(existing),
         targetSalary: existing.targetSalary,
+        targetologistId: existing.targetologistId || "",
         performancePct: existing.performancePct,
         performanceBase: existing.performanceBase,
         performanceSalary: existing.performanceSalary,
@@ -727,7 +821,8 @@
       projectId,
       projectName: currentRow?.projectName || project?.name || "Project",
       paymentStatus: $("#adjustPaymentStatus").value,
-      targetologistId: currentRow?.targetologistId || project?.targetologistId || "",
+      targetologists,
+      targetologistId: targetologists[0]?.memberId || "",
       performanceId: currentRow?.performanceId || project?.performanceId || "",
       leadManagerId: currentRow?.leadManagerId || project?.leadManagerId || "",
       manualOverride: true,
@@ -758,9 +853,6 @@
           manualOverride: false,
           baseline: null
         };
-      } else if (state.closedMonths.includes(selectedMonth)) {
-        state.snapshots[idx].manualOverride = false;
-        state.snapshots[idx].baseline = null;
       } else {
         state.snapshots[idx].manualOverride = false;
         state.snapshots[idx].baseline = null;
@@ -812,18 +904,25 @@
     saveState();
 
     if(!id && assignmentRole && !$("#projectModal").hidden){
-      const selections={
-        targetologistId:$("#targetologistId").value,
-        performanceId:$("#performanceId").value,
-        leadManagerId:$("#leadManagerId").value
-      };
-      if(assignmentRole==="targetologist") selections.targetologistId=member.id;
-      if(assignmentRole==="performance") selections.performanceId=member.id;
-      if(assignmentRole==="lead") selections.leadManagerId=member.id;
+      if(assignmentRole==="targetologist"){
+        const targets=readTargetologistRows("#targetologistRows");
+        const emptyIndex=targets.findIndex(item=>!item.memberId);
+        if(emptyIndex>=0) targets[emptyIndex].memberId=member.id;
+        else targets.push({memberId:member.id,salary:0});
+        renderTargetologistRows("#targetologistRows",targets,"project");
+        updateLiveModel();
+      }else{
+        const performanceId=$("#performanceId").value;
+        const leadManagerId=$("#leadManagerId").value;
+        populateAssignmentSelects({
+          targetologists:readTargetologistRows("#targetologistRows"),
+          performanceId:assignmentRole==="performance"?member.id:performanceId,
+          leadManagerId:assignmentRole==="lead"?member.id:leadManagerId
+        });
+      }
       pendingAssignmentRole="";
       $("#memberModal").hidden=true;
       $("#memberRole").disabled=false;
-      populateAssignmentSelects(selections);
       renderTeam();
       return;
     }
@@ -837,11 +936,26 @@
     const m=getMember(id);
     showConfirm("Delete team member?","Assignments in active projects will become unassigned. Historical snapshots remain unchanged.",()=>{
       state.team=state.team.filter(x=>x.id!==id);
-      state.projects=state.projects.map(p=>({...p,
-        targetologistId:p.targetologistId===id?"":p.targetologistId,
-        performanceId:p.performanceId===id?"":p.performanceId,
-        leadManagerId:p.leadManagerId===id?"":p.leadManagerId
-      }));
+      state.projects=state.projects.map(p=>{
+        const targets=normalizeTargetologists(p).filter(item=>item.memberId!==id);
+        return {...p,
+          targetologists:targets,
+          targetSalary:targets.reduce((sum,item)=>sum+n(item.salary),0),
+          targetologistId:targets[0]?.memberId||"",
+          performanceId:p.performanceId===id?"":p.performanceId,
+          leadManagerId:p.leadManagerId===id?"":p.leadManagerId
+        };
+      });
+      state.monthlySettings=state.monthlySettings.map(s=>{
+        const targets=normalizeTargetologists(s).filter(item=>item.memberId!==id);
+        return {...s,
+          targetologists:targets,
+          targetSalary:targets.reduce((sum,item)=>sum+n(item.salary),0),
+          targetologistId:targets[0]?.memberId||"",
+          performanceId:s.performanceId===id?"":s.performanceId,
+          leadManagerId:s.leadManagerId===id?"":s.leadManagerId
+        };
+      });
       if(selectedEmployeeId===id)selectedEmployeeId="";
       saveState();closeMemberModal();hideConfirm();render();showToast((m?.name||"Member")+" deleted");
     },"Delete");
@@ -898,7 +1012,10 @@
   $$("[data-open-project]").forEach(x=>x.addEventListener("click",()=>openProjectModal()));
   $$("[data-close-project]").forEach(x=>x.addEventListener("click",closeProjectModal));
   $("#projectForm").addEventListener("submit",submitProject);
-  ["#projectRevenue","#targetSalary","#performancePct","#leadPct"].forEach(s=>$(s).addEventListener("input",updateLiveModel));
+  ["#projectRevenue","#performancePct","#leadPct"].forEach(s=>$(s).addEventListener("input",updateLiveModel));
+  $("#targetologistRows").addEventListener("input",updateLiveModel);
+  $("#targetologistRows").addEventListener("change",updateLiveModel);
+  $("#addTargetologistRowBtn").addEventListener("click",()=>{addTargetologistRow("#targetologistRows","project");updateLiveModel();});
   $("#projectStartMonth").addEventListener("change",e=>{
     if(!$("#projectId").value){
       $("#projectEffectiveMonth").textContent=monthLabel(e.target.value||selectedMonth);
@@ -909,7 +1026,10 @@
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
   document.querySelectorAll("[data-close-adjustment]").forEach(x=>x.addEventListener("click",closeAdjustmentModal));
   $("#adjustmentForm").addEventListener("submit",submitAdjustment);
-  ["#adjustRevenue","#adjustTargetSalary","#adjustPerformancePct","#adjustLeadPct"].forEach(s=>$(s).addEventListener("input",updateAdjustmentLiveModel));
+  ["#adjustRevenue","#adjustPerformancePct","#adjustLeadPct"].forEach(s=>$(s).addEventListener("input",updateAdjustmentLiveModel));
+  $("#adjustTargetologistRows").addEventListener("input",updateAdjustmentLiveModel);
+  $("#adjustTargetologistRows").addEventListener("change",updateAdjustmentLiveModel);
+  $("#addAdjustTargetologistRowBtn").addEventListener("click",()=>{addTargetologistRow("#adjustTargetologistRows","adjust");updateAdjustmentLiveModel();});
   $("#removeAdjustmentBtn").addEventListener("click",removeAdjustment);
   $$("[data-close-member]").forEach(x=>x.addEventListener("click",closeMemberModal));
   $("#memberForm").addEventListener("submit",submitMember);
@@ -925,6 +1045,14 @@
   $("#confirmDialog").addEventListener("click",e=>{if(e.target===$("#confirmDialog"))hideConfirm();});
 
   document.addEventListener("click",e=>{
+    const removeTarget=e.target.closest("[data-remove-targetologist]");
+    if(removeTarget){
+      const scope=removeTarget.dataset.removeTargetologist;
+      const container=scope==="adjust"?"#adjustTargetologistRows":"#targetologistRows";
+      removeTargetologistRow(container,scope,removeTarget.dataset.targetIndex);
+      scope==="adjust"?updateAdjustmentLiveModel():updateLiveModel();
+      return;
+    }
     const inlineRole=e.target.closest("[data-inline-add-role]");
     if(inlineRole){openMemberModal("",inlineRole.dataset.inlineAddRole,true);return;}
     const addRole=e.target.closest("[data-add-role-member]");
