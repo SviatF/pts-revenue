@@ -620,7 +620,7 @@
   function readTargetologistRows(containerSelector, includeEmpty = false) {
     const container = $(containerSelector);
     if (!container) return [];
-    const rows = $(".targetologist-assignment-row", container).map(row => ({
+    const rows = $$(".targetologist-assignment-row", container).map(row => ({
       memberId: $(".target-person-select", row)?.value || "",
       salary: Math.max(0, n($(".target-salary-input", row)?.value))
     }));
@@ -1118,9 +1118,9 @@
   $("#deleteProjectBtn").addEventListener("click",deleteProject);
   $("#endCollaborationBtn").addEventListener("click",openEndCollaborationModal);
   $("#confirmEndCollaborationBtn").addEventListener("click",confirmEndCollaboration);
-  $("[data-close-end-collaboration]").forEach(x=>x.addEventListener("click",closeEndCollaborationModal));
-  $('input[name="endCollaborationMode"]').forEach(r=>r.addEventListener("change",()=>{
-    $(".end-option").forEach(opt=>opt.classList.toggle("selected",$('input',opt)?.checked));
+  $$("[data-close-end-collaboration]").forEach(x=>x.addEventListener("click",closeEndCollaborationModal));
+  $$('input[name="endCollaborationMode"]').forEach(r=>r.addEventListener("change",()=>{
+    $$(".end-option").forEach(opt=>opt.classList.toggle("selected",$('input',opt)?.checked));
   }));
   $("#projectStatusFilter").addEventListener("change",renderProjects);
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
