@@ -689,9 +689,19 @@
   function submitProject(ev) {
     ev.preventDefault();
     const id=$("#projectId").value;
+    const targetologists=readTargetologistRows("#targetologistRows");
+    if(targetologists.some(item=>!item.memberId && item.salary>0)){
+      showToast("Select a person for every targetologist salary");
+      return;
+    }
+    const targetIds=targetologists.map(item=>item.memberId).filter(Boolean);
+    if(new Set(targetIds).size!==targetIds.length){
+      showToast("The same targetologist cannot be added twice");
+      return;
+    }
     const financials=financeFields({
       monthlyFee:n($("#projectRevenue").value),
-      targetologists:readTargetologistRows("#targetologistRows"),
+      targetologists,
       performancePct:n($("#performancePct").value),
       leadPct:n($("#leadPct").value),
       performanceId:$("#performanceId").value,
@@ -761,6 +771,15 @@
 
   function updateAdjustmentLiveModel() {
     const targetologists = readTargetologistRows("#adjustTargetologistRows");
+    if(targetologists.some(item=>!item.memberId && item.salary>0)){
+      showToast("Select a person for every targetologist salary");
+      return;
+    }
+    const targetIds=targetologists.map(item=>item.memberId).filter(Boolean);
+    if(new Set(targetIds).size!==targetIds.length){
+      showToast("The same targetologist cannot be added twice");
+      return;
+    }
     const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
     const e = computeEconomics(
       $("#adjustRevenue").value,
