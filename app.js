@@ -565,7 +565,10 @@
     $("#projectStatus").value=p?.status||"active";
     $("#projectStartMonth").value=p?.startMonth||selectedMonth;
     populateAssignmentSelects(p ? terms : {});
-    $("#projectEffectiveMonth").textContent = p ? monthLabel(selectedMonth) : monthLabel($("#projectStartMonth").value || selectedMonth);
+    const effectiveMonth = p
+      ? (selectedMonth < (p.startMonth || selectedMonth) ? (p.startMonth || selectedMonth) : selectedMonth)
+      : ($("#projectStartMonth").value || selectedMonth);
+    $("#projectEffectiveMonth").textContent = monthLabel(effectiveMonth);
     $("#projectTermsHelp").textContent = p
       ? "Changes start from this month. Earlier months keep their original revenue, rates and team."
       : "These are the starting terms for the project.";
@@ -896,6 +899,11 @@
   $$("[data-close-project]").forEach(x=>x.addEventListener("click",closeProjectModal));
   $("#projectForm").addEventListener("submit",submitProject);
   ["#projectRevenue","#targetSalary","#performancePct","#leadPct"].forEach(s=>$(s).addEventListener("input",updateLiveModel));
+  $("#projectStartMonth").addEventListener("change",e=>{
+    if(!$("#projectId").value){
+      $("#projectEffectiveMonth").textContent=monthLabel(e.target.value||selectedMonth);
+    }
+  });
   $("#deleteProjectBtn").addEventListener("click",deleteProject);
   $("#projectStatusFilter").addEventListener("change",renderProjects);
   $("#addMemberBtn").addEventListener("click",()=>openMemberModal());
