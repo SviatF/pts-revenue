@@ -479,20 +479,14 @@
             <div class="project-role-stack">
               <section class="project-role-card role-target">
                 <div class="project-role-title">
-                  <div><span class="role-dot"></span><div><strong>Targetologist</strong><small>Fixed salary per project</small></div></div>
-                  <button type="button" class="inline-add-member" data-inline-add-role="targetologist">+ Add person</button>
+                  <div><span class="role-dot"></span><div><strong>Targetologists</strong><small>One or more people · fixed salary per person</small></div></div>
+                  <div class="role-title-actions">
+                    <button type="button" class="inline-add-member" data-inline-add-role="targetologist">+ New person</button>
+                    <button type="button" class="inline-add-member primary-inline" id="addTargetologistRowBtn">+ Add targetologist</button>
+                  </div>
                 </div>
-                <div class="project-role-fields">
-                  <label>
-                    <span>Person</span>
-                    <select id="targetologistId"></select>
-                  </label>
-                  <label>
-                    <span>Fixed salary, $</span>
-                    <input id="targetSalary" type="number" min="0" step="0.01" required placeholder="250" />
-                  </label>
-                </div>
-                <div class="role-calculation"><span>Salary from this project</span><strong id="targetSalaryPreview">$0</strong></div>
+                <div id="targetologistRows" class="targetologist-rows"></div>
+                <div class="role-calculation"><span>Total targetologists salary</span><strong id="targetSalaryPreview">$0</strong></div>
               </section>
 
               <section class="project-role-card role-performance">
@@ -597,16 +591,18 @@
               <span>Revenue for this month, $</span>
               <input id="adjustRevenue" type="number" min="0" step="0.01" required />
             </label>
-            <div class="form-row">
-              <label>
-                <span>Targetologist rate, $</span>
-                <input id="adjustTargetSalary" type="number" min="0" step="0.01" required />
-              </label>
-              <label>
-                <span>Performance, %</span>
-                <input id="adjustPerformancePct" type="number" min="0" max="100" step="0.01" required />
-              </label>
+            <div class="adjustment-targets-block">
+              <div class="adjustment-targets-head">
+                <div><span class="role-dot"></span><strong>Targetologists for this month</strong></div>
+                <button type="button" class="inline-add-member" id="addAdjustTargetologistRowBtn">+ Add targetologist</button>
+              </div>
+              <div id="adjustTargetologistRows" class="targetologist-rows"></div>
+              <div class="role-calculation"><span>Total targetologists salary</span><strong id="adjustTargetSalaryPreview">$0</strong></div>
             </div>
+            <label>
+              <span>Performance, %</span>
+              <input id="adjustPerformancePct" type="number" min="0" max="100" step="0.01" required />
+            </label>
             <label>
               <span>Lead manager, % of full check</span>
               <input id="adjustLeadPct" type="number" min="0" max="100" step="0.01" required />
