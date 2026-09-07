@@ -559,8 +559,9 @@
             <p id="modelFormula">Performance = (Revenue − Targetologist) × %</p>
           </aside>
         </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-danger" id="deleteProjectBtn" hidden>Delete</button>
+        <div class="modal-actions project-danger-actions">
+          <button type="button" class="btn btn-danger" id="deleteProjectBtn" hidden>Delete project</button>
+          <button type="button" class="btn btn-end-collab" id="endCollaborationBtn" hidden>End collaboration</button>
           <div class="spacer"></div>
           <button type="button" class="btn btn-ghost" data-close-project>Cancel</button>
           <button type="submit" class="btn btn-primary">Save project</button>
@@ -569,7 +570,55 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="adjustmentModal" hidden>
+  
+  <div class="modal-backdrop" id="endCollaborationModal" hidden>
+    <div class="modal end-collaboration-modal" role="dialog" aria-modal="true" aria-labelledby="endCollaborationTitle">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">COLLABORATION STATUS</span>
+          <h2 id="endCollaborationTitle">End collaboration</h2>
+        </div>
+        <button class="icon-btn" data-close-end-collaboration aria-label="Закрити">×</button>
+      </div>
+
+      <input type="hidden" id="endCollaborationProjectId" />
+
+      <div class="end-collaboration-context">
+        <span>Selected month</span>
+        <strong id="endCollaborationMonth">—</strong>
+      </div>
+
+      <div class="end-options">
+        <label class="end-option selected">
+          <input type="radio" name="endCollaborationMode" value="after" checked />
+          <div>
+            <strong>After this month</strong>
+            <span>The project stays in the selected month and disappears starting next month.</span>
+          </div>
+        </label>
+        <label class="end-option">
+          <input type="radio" name="endCollaborationMode" value="from" />
+          <div>
+            <strong>From this month</strong>
+            <span>The project is removed from the selected month and all future months.</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="end-history-note">
+        <span>History is preserved</span>
+        <p>Previous months, revenue, salaries and team analytics will not be changed.</p>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-end-collaboration>Cancel</button>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn-end-collab confirm-end" id="confirmEndCollaborationBtn">End collaboration</button>
+      </div>
+    </div>
+  </div>
+
+<div class="modal-backdrop" id="adjustmentModal" hidden>
     <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="adjustmentModalTitle">
       <div class="modal-head">
         <div>
