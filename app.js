@@ -415,6 +415,15 @@
     $("#kpiPayroll").textContent = money.format(m.payroll);
     $("#kpiMargin").textContent = pct(m.margin);
     $("#kpiProjects").textContent = m.count;
+    const newProjects = state.projects.filter(p => p.startMonth === selectedMonth).length;
+    const endedProjects = state.projects.filter(p => inferredInactiveFrom(p) === selectedMonth).length;
+    const movementNet = newProjects - endedProjects;
+    $("#kpiProjectMovement").textContent = (movementNet > 0 ? "+" : "") + movementNet;
+    $("#kpiProjectMovement").classList.toggle("positive", movementNet > 0);
+    $("#kpiProjectMovement").classList.toggle("negative", movementNet < 0);
+    $("#kpiProjectMovement").classList.toggle("neutral", movementNet === 0);
+    $("#kpiNewProjects").textContent = "+" + newProjects + " new";
+    $("#kpiEndedProjects").textContent = "−" + endedProjects + " ended";
     $("#kpiAvg").textContent = money.format(m.avg);
     $("#kpiRevenueChange").innerHTML = changeHtml(change(m.revenue, prev.revenue));
     $("#kpiNetChange").innerHTML = changeHtml(change(m.net, prev.net));
@@ -667,7 +676,7 @@
     });
 
     const numberIds = [
-      "kpiRevenue","kpiNet","kpiPayroll","kpiMargin","kpiProjects","kpiAvg",
+      "kpiRevenue","kpiNet","kpiPayroll","kpiMargin","kpiProjects","kpiProjectMovement","kpiAvg",
       "projectMrr","projectNet","projectMargin","projectCount",
       "compPayroll","compTarget","compPerformance","compLead",
       "forecastMrr","forecastRevenue","forecastNet","forecastMargin",
