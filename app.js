@@ -579,7 +579,7 @@
 
   function teamMemberCard(member) {
     const s = memberMonthStats(member.id, selectedMonth);
-    return '<article class="team-card employee-open-card" role="button" tabindex="0" aria-label="View earnings for ' + esc(member.name) + '" data-member-card="' + member.id + '"><div class="team-card-top"><span class="avatar">' + esc(initials(member.name)) + '</span><div class="team-card-name"><strong>' + esc(member.name) + '</strong><span>' + esc(roleLabel(member.role)) + '</span></div><button class="small-icon-btn" style="margin-left:auto" data-edit-member="' + member.id + '" aria-label="Edit ' + esc(member.name) + '">···</button></div><div class="team-card-pay"><div><span>Salary this month</span><strong>' + money.format(s.salary) + '</strong></div><div><span>Projects</span><strong>' + s.count + '</strong></div></div><div class="employee-card-hint">' + (s.fixedSalary > 0 ? 'Operating expense · ' : '') + 'View salary breakdown →</div></article>';
+    return '<article class="team-card employee-open-card" role="button" tabindex="0" aria-label="View earnings for ' + esc(member.name) + '" data-member-card="' + member.id + '"><div class="team-card-top"><span class="avatar">' + esc(initials(member.name)) + '</span><div class="team-card-name"><strong>' + esc(member.name) + '</strong><span>' + esc(roleLabel(member.role)) + '</span></div><button class="small-icon-btn" style="margin-left:auto" data-edit-member="' + member.id + '" aria-label="Edit ' + esc(member.name) + '">···</button></div><div class="team-card-pay"><div><span>Total salary</span><strong>' + money.format(s.salary) + '</strong></div><div><span>Projects</span><strong>' + s.count + '</strong></div></div><div class="employee-fixed-row"><div><span>Fixed monthly rate</span><strong>' + money.format(s.fixedSalary) + '</strong><small>+ ' + money.format(s.projectSalary) + ' from projects</small></div><button type="button" class="employee-rate-btn" data-edit-fixed-member="' + member.id + '">Edit rate</button></div><div class="employee-card-hint">View salary breakdown →</div></article>';
   }
 
   function renderTeam() {
@@ -1176,10 +1176,9 @@
 
 
   function updateMemberSalaryVisibility() {
-    const isDeveloper = $("#memberRole").value === "developer";
-    $("#developerSalaryFields").hidden = !isDeveloper;
-    $("#developerSalaryMonth").textContent = monthLabel(selectedMonth);
-    $("#memberMonthlySalary").required = isDeveloper;
+    $("#fixedSalaryFields").hidden = false;
+    $("#fixedSalaryMonth").textContent = monthLabel(selectedMonth);
+    $("#memberMonthlySalary").required = false;
   }
 
   function renderEmployeeDetails(memberId) {
@@ -1222,7 +1221,7 @@
     $("#employeeDetailsModal").hidden = true;
   }
 
-  function openMemberModal(id="", presetRole="", assignAfterCreate=false){
+  function openMemberModal(id="", presetRole="", assignAfterCreate=false, focusRate=false){
     const m=state.team.find(x=>x.id===id);
     pendingAssignmentRole = !m && assignAfterCreate ? presetRole : "";
     $("#memberModal").hidden=false;
@@ -1231,10 +1230,10 @@
     $("#memberName").value=m?.name||"";
     $("#memberRole").value=m?.role||presetRole||"targetologist";
     $("#memberRole").disabled = Boolean(presetRole && !m);
-    $("#memberMonthlySalary").value = m ? monthlyDeveloperSalary(m, selectedMonth) : "";
+    $("#memberMonthlySalary").value = m ? monthlyFixedSalary(m, selectedMonth) : 0;
     updateMemberSalaryVisibility();
     $("#deleteMemberBtn").hidden=!m;
-    setTimeout(()=>$("#memberName").focus(),0);
+    setTimeout(() => $(focusRate ? "#memberMonthlySalary" : "#memberName").focus(),0);
   }
   function closeMemberModal(){
     $("#memberModal").hidden=true;
@@ -1249,25 +1248,26 @@
     const member={id:id||uid("tm"),name:$("#memberName").value.trim(),role,status:"active",updatedAt:new Date().toISOString()};
     if(!member.name)return;
     const previous = id ? getMember(id) : null;
-    const affectsDeveloperRate = role === "developer" || previous?.role === "developer";
-    if (affectsDeveloperRate && state.closedMonths.includes(selectedMonth)) {
-      showToast("Month is closed. Select an open month to change developer salary.");
+    const monthlySalary = Math.max(0, n($("#memberMonthlySalary").value));
+    const oldMonthlySalary = previous ? monthlyFixedSalary(previous, selectedMonth) : 0;
+    const rateChanged = !previous ? monthlySalary > 0 : Math.abs(monthlySalary - oldMonthlySalary) > 0.0001;
+    if (state.closedMonths.includes(selectedMonth) && rateChanged) {
+      showToast("Month closed. Select an open month to change fixed salary.");
       return;
     }
-    const monthlySalary = role === "developer" ? Math.max(0, n($("#memberMonthlySalary").value)) : 0;
     const assignmentRole = pendingAssignmentRole;
     if(id){
-      if (previous?.role === "developer") ensureDeveloperBaseline(previous);
+      if (previous) ensureFixedBaseline(previous);
       const idx=state.team.findIndex(x=>x.id===id);
       if(idx>=0)state.team[idx]={...state.team[idx],...member};
-      if (affectsDeveloperRate) setDeveloperSalary(member.id, selectedMonth, monthlySalary);
+      if (rateChanged) setFixedSalary(member.id, selectedMonth, monthlySalary);
       showToast("Member updated");
     }else{
       member.createdAt=new Date().toISOString();
       member.startMonth=selectedMonth;
       member.monthlySalary=monthlySalary;
       state.team.push(member);
-      if (role === "developer") setDeveloperSalary(member.id, selectedMonth, monthlySalary);
+      if (rateChanged) setFixedSalary(member.id, selectedMonth, monthlySalary);
       showToast(roleLabel(member.role) + " added");
     }
 
@@ -1443,6 +1443,8 @@
     if(editDefault){openProjectModal(editDefault.dataset.editDefault);return;}
     const adjustProject=e.target.closest("[data-adjust-project]");
     if(adjustProject){openAdjustmentModal(adjustProject.dataset.adjustProject);return;}
+    const rateMember=e.target.closest("[data-edit-fixed-member]");
+    if(rateMember){e.stopPropagation();openMemberModal(rateMember.dataset.editFixedMember,"",false,true);return;}
     const editMember=e.target.closest("[data-edit-member]");
     if(editMember){e.stopPropagation();openMemberModal(editMember.dataset.editMember);return;}
     const memberCard=e.target.closest("[data-member-card]");
@@ -1503,7 +1505,7 @@
 
   window.PTSFinance = {
     getState:()=>structuredClone(state),
-    getOperatingCost:(month)=>developerExpenseForMonth(month),
+    getOperatingCost:(month)=>fixedSalaryExpenseForMonth(month),
     testFormula:()=>computeEconomics(300,100,30,5)
   };
 })();
