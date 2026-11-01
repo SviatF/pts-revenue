@@ -303,6 +303,23 @@
     return state.team.reduce((sum, member) => sum + monthlyFixedSalary(member, month), 0);
   }
 
+  // All agency-wide financial summaries use the same net-after-fixed-salaries source.
+  // Project row economics remain pre-OPEX; fixed salaries are not allocated twice.
+  function agencyMetrics(month) {
+    const projects = metrics(rowsForMonth(month));
+    const fixedSalaries = fixedSalaryExpenseForMonth(month);
+    const net = projects.net - fixedSalaries;
+    return {
+      ...projects,
+      projectNet: projects.net,
+      projectPayroll: projects.payroll,
+      fixedSalaries,
+      net,
+      payroll: projects.payroll + fixedSalaries,
+      margin: projects.revenue ? net / projects.revenue * 100 : 0
+    };
+  }
+
   function fixedSalaryForRole(role, month) {
     if (state.closedMonths.includes(month)) {
       const snap = (state.operatingSnapshots || []).find(s => s.month === month);
@@ -457,8 +474,8 @@
 
   function renderOverview() {
     const rows = rowsForMonth(selectedMonth);
-    const m = metrics(rows);
-    const prev = metrics(rowsForMonth(shiftMonth(selectedMonth, -1)));
+    const m = agencyMetrics(selectedMonth);
+    const prev = agencyMetrics(shiftMonth(selectedMonth, -1));
     $("#overviewMonthName").textContent = monthLabel(selectedMonth);
     const locked = state.closedMonths.includes(selectedMonth);
     $("#monthStateBadge").textContent = locked ? "CLOSED" : "LIVE";
@@ -470,10 +487,6 @@
     $("#kpiRevenue").textContent = money.format(m.revenue);
     $("#kpiNet").textContent = money.format(m.net);
     $("#kpiPayroll").textContent = money.format(m.payroll);
-    const devCost = fixedSalaryExpenseForMonth(selectedMonth);
-    $("#operatingFixedCost").textContent = money.format(devCost);
-    $("#operatingProjectNet").textContent = money.format(m.net);
-    $("#operatingProfit").textContent = money.format(m.net - devCost);
     $("#kpiMargin").textContent = pct(m.margin);
     $("#kpiProjects").textContent = m.count;
     const newProjects = state.projects.filter(p => p.startMonth === selectedMonth).length;
@@ -496,7 +509,7 @@
     $("#collectedRevenue").textContent = money.format(m.collected);
 
     const months = Array.from({ length: 12 }, (_, i) => shiftMonth(selectedMonth, i - 11));
-    const history = months.map(k => metrics(rowsForMonth(k)));
+    const history = months.map(k => agencyMetrics(k));
     lineChart("#revenueChart", [
       { name: "Revenue", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.revenue), stroke: "#ff2f92" },
       { name: "Net profit", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.net), stroke: "#b8c0cc" }
@@ -513,11 +526,19 @@
       { key: "target", name: "Targetologists", value: m.target, cls: "target", dot: "#ff2f92" },
       { key: "performance", name: "Performance", value: m.performance, cls: "performance", dot: "#9357ff" },
       { key: "lead", name: "Lead managers", value: m.lead, cls: "lead", dot: "#37b9ff" },
+      { key: "fixed", name: "Fixed salaries", value: m.fixedSalaries, cls: "fixed", dot: "#f7ad4c" },
       { key: "net", name: "Agency net", value: m.net, cls: "net", dot: "#17e78a" }
     ];
-    const rawPcts = parts.map(p => Math.max(0, m.revenue ? p.value / m.revenue * 100 : 0));
-    const a = rawPcts[0], b = a + rawPcts[1], d = b + rawPcts[2], e = Math.min(100, d + rawPcts[3]);
-    $("#costStack").style.background = 'conic-gradient(#ff2f92 0 ' + a + '%, #9357ff ' + a + '% ' + b + '%, #37b9ff ' + b + '% ' + d + '%, #17e78a ' + d + '% ' + e + '%, #1a1e25 ' + e + '% 100%)';
+    // If operating net is negative, draw only positive portions scaled to fit a full ring;
+    // the breakdown still shows the signed net value, rather than fabricating profit.
+    const positiveTotal = parts.reduce((sum, part) => sum + Math.max(0, part.value), 0);
+    let angle = 0;
+    const slices = parts.filter(part => part.value > 0).map(part => {
+      const start = angle;
+      angle += positiveTotal > 0 ? part.value / positiveTotal * 100 : 0;
+      return part.dot + " " + start.toFixed(3) + "% " + angle.toFixed(3) + "%";
+    });
+    $("#costStack").style.background = slices.length ? "conic-gradient(" + slices.join(", ") + ")" : "#1a1e25";
     $("#costStack").innerHTML = '<div class="donut-center"><strong>' + money.format(m.revenue).replace(".00","") + '</strong><span>Total revenue</span></div>';
     $("#costBreakdown").innerHTML = parts.map(p => '<div class="breakdown-row"><i class="breakdown-dot" style="background:' + p.dot + ';box-shadow:0 0 12px ' + p.dot + '55"></i><span class="breakdown-name">' + p.name + '</span><strong class="breakdown-value">' + money.format(p.value) + '</strong><span class="breakdown-pct">' + pct(m.revenue ? p.value / m.revenue * 100 : 0) + "</span></div>").join("");
     $("#costMonthChip").textContent = monthLabel(selectedMonth);
@@ -527,9 +548,9 @@
 
     $("#overviewProjectsTable").innerHTML = rows.length ? rows.map(r => '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(r.projectName)) + '</span><strong>' + esc(r.projectName) + '</strong></div></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.totalPayroll) + '</td><td><strong>' + money.format(r.agencyNet) + '</strong></td><td>' + pct(r.margin) + '</td><td><select class="payment-select payment-' + esc(r.paymentStatus) + '" data-payment-project="' + esc(r.projectId) + '"><option value="paid"' + (r.paymentStatus==="paid"?" selected":"") + '>Paid</option><option value="pending"' + (r.paymentStatus==="pending"?" selected":"") + '>Pending</option><option value="overdue"' + (r.paymentStatus==="overdue"?" selected":"") + ">Overdue</option></select></td></tr>").join("") : '<tr><td colspan="6" class="muted">No projects in this month.</td></tr>';
 
-    $("#sideTeamPayroll").textContent = money.format(m.payroll + fixedSalaryExpenseForMonth(selectedMonth));
+    $("#sideTeamPayroll").textContent = money.format(m.payroll);
     $("#sideTeamCount").textContent = state.team.length + " team members";
-    $("#sideAvgSalary").textContent = money.format(state.team.length ? (m.payroll + fixedSalaryExpenseForMonth(selectedMonth)) / state.team.length : 0);
+    $("#sideAvgSalary").textContent = money.format(state.team.length ? m.payroll / state.team.length : 0);
     $("#sideMargin").textContent = pct(m.margin);
     $("#sideMarginDelta").innerHTML = marginDelta === null ? "No prior month" : '<span class="' + (marginDelta >= 0 ? "positive" : "negative") + '">' + (marginDelta >= 0 ? "↑ " : "↓ ") + Math.abs(marginDelta).toFixed(1) + 'pp</span>';
     $("#sideRunRate").textContent = money.format(m.revenue * 12);
@@ -543,7 +564,7 @@
     if (filter === "paused") projects = projects.filter(p => p.status === "paused");
     if (filter === "churned") projects = projects.filter(p => p.inactiveFrom ? selectedMonth >= p.inactiveFrom : p.status === "churned");
     const activeRows = rowsForMonth(selectedMonth);
-    const m = metrics(activeRows);
+    const m = agencyMetrics(selectedMonth);
     $("#projectMrr").textContent = money.format(m.revenue);
     $("#projectNet").textContent = money.format(m.net);
     $("#projectMargin").textContent = pct(m.margin);
@@ -638,11 +659,11 @@
 
   function renderCompensation() {
     const rows = rowsForMonth(selectedMonth);
-    const m = metrics(rows);
+    const m = agencyMetrics(selectedMonth);
     $("#compensationMonthTitle").textContent = monthLabel(selectedMonth);
-    $("#compPayroll").textContent = money.format(m.payroll);
-    $("#compFixedSalaries").textContent = money.format(fixedSalaryExpenseForMonth(selectedMonth));
-    $("#compOperatingProfit").textContent = money.format(m.net - fixedSalaryExpenseForMonth(selectedMonth));
+    $("#compPayroll").textContent = money.format(m.projectPayroll);
+    $("#compFixedSalaries").textContent = money.format(m.fixedSalaries);
+    $("#compOperatingProfit").textContent = money.format(m.net);
     $("#compTarget").textContent = money.format(m.target);
     $("#compPerformance").textContent = money.format(m.performance);
     $("#compLead").textContent = money.format(m.lead);
@@ -658,10 +679,12 @@
 
   function renderAnalytics() {
     const rows = rowsForMonth(selectedMonth);
-    const m = metrics(rows);
+    const m = agencyMetrics(selectedMonth);
     const months = Array.from({length:12},(_,i)=>shiftMonth(selectedMonth,i-11));
-    const hist = months.map(k=>metrics(rowsForMonth(k)));
-    lineChart("#marginChart", [{ name:"Margin", labels:months.map(k=>shortMonthFmt.format(dateFromMonth(k))), values:hist.map(x=>x.margin), stroke:"#f4f4f4" }], {percent:true, min:0, max:100});
+    const hist = months.map(k=>agencyMetrics(k));
+    const margins = hist.map(x => x.margin);
+    lineChart("#marginChart", [{ name:"Margin", labels:months.map(k=>shortMonthFmt.format(dateFromMonth(k))), values:margins, stroke:"#f4f4f4" }],
+      {percent:true, min:Math.min(0, ...margins), max:Math.max(100, ...margins)});
 
     $("#ratioPayroll").textContent = pct(m.revenue ? m.payroll/m.revenue*100 : 0);
     $("#ratioNet").textContent = pct(m.margin);
@@ -670,7 +693,7 @@
     $("#ratioConcentration").textContent = pct(m.revenue ? top5Revenue/m.revenue*100 : 0);
 
     const roleItems = [["Targetologists",m.target],["Performance",m.performance],["Lead managers",m.lead],
-      ["Fixed salaries · operations",fixedSalaryExpenseForMonth(selectedMonth)]];
+      ["Fixed salaries · operations",m.fixedSalaries]];
     const maxRole = Math.max(...roleItems.map(([, value]) => value), 1);
     $("#rolePayroll").innerHTML = roleItems.map(([name,val]) => '<div class="bar-row"><div class="bar-row-head"><span>' + name + '</span><strong>' + money.format(val) + '</strong></div><div class="bar-track"><div class="bar-fill" style="width:' + (val/maxRole*100) + '%"></div></div></div>').join("");
 
@@ -679,8 +702,8 @@
 
     $("#forecastMrr").textContent = money.format(m.revenue);
     $("#forecastRevenue").textContent = money.format(m.revenue*12);
-    $("#forecastNet").textContent = money.format((m.net - fixedSalaryExpenseForMonth(selectedMonth))*12);
-    $("#forecastMargin").textContent = pct(m.revenue ? (m.net - fixedSalaryExpenseForMonth(selectedMonth)) / m.revenue * 100 : 0);
+    $("#forecastNet").textContent = money.format(m.net * 12);
+    $("#forecastMargin").textContent = pct(m.margin);
   }
 
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -1506,6 +1529,7 @@
   window.PTSFinance = {
     getState:()=>structuredClone(state),
     getOperatingCost:(month)=>fixedSalaryExpenseForMonth(month),
+    getAgencyMetrics:(month)=>agencyMetrics(month),
     testFormula:()=>computeEconomics(300,100,30,5)
   };
 })();
