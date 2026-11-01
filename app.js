@@ -538,11 +538,13 @@
     $("#projectsEmpty").hidden = state.projects.length > 0;
     $("#projectsTable").innerHTML = projects.map(p => {
       const terms = settingsForProjectMonth(p, selectedMonth);
-      const targetologists = normalizeTargetologists(terms);
+      const savedRow = activeRows.find(row => row.projectId === p.id);
+      const source = savedRow || terms;
+      const targetologists = normalizeTargetologists(source);
       const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
-      const e = activeRows.find(row => row.projectId === p.id) || computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
-      const performance = getMember(terms.performanceId);
-      const lead = getMember(terms.leadManagerId);
+      const e = savedRow || computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
+      const performance = getMember(source.performanceId);
+      const lead = getMember(source.leadManagerId);
       const roleCell = (member, salary, detail = "") =>
         '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(salary) + (detail ? ' · ' + detail : '') + '</span></div>';
       const targetCell = targetologists.length
