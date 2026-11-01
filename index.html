@@ -112,17 +112,17 @@
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiRevenueChange">No previous month data</span><div class="kpi-spark" id="sparkRevenue"></div></div>
           </article>
           <article class="kpi-card kpi-pink">
-            <div class="kpi-top"><span class="kpi-icon">▱</span><span class="kpi-label">Agency net</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">▱</span><span class="kpi-label">Agency net · pre-OPEX</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiNet">$0</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiNetChange">—</span><div class="kpi-spark" id="sparkNet"></div></div>
           </article>
           <article class="kpi-card">
-            <div class="kpi-top"><span class="kpi-icon">♧</span><span class="kpi-label">Total payroll</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">♧</span><span class="kpi-label">Project payroll</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiPayroll">$0</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiPayrollRatio">0% of revenue</span><div class="kpi-spark" id="sparkPayroll"></div></div>
           </article>
           <article class="kpi-card kpi-green">
-            <div class="kpi-top"><span class="kpi-icon">%</span><span class="kpi-label">Net margin</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">%</span><span class="kpi-label">Project margin</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiMargin">0%</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiMarginChange">—</span><div class="kpi-spark" id="sparkMargin"></div></div>
           </article>
@@ -157,11 +157,11 @@
             <div class="panel-head">
               <div class="panel-title-row">
                 <span class="panel-icon neon">▥</span>
-                <div><h2>Revenue vs net profit</h2></div>
+                <div><h2>Revenue vs project net</h2></div>
               </div>
               <div class="legend">
                 <span><i class="legend-dot pink"></i>Revenue</span>
-                <span><i class="legend-dot gray"></i>Net profit</span>
+                <span><i class="legend-dot gray"></i>Before operating costs</span>
               </div>
             </div>
             <div id="revenueChart" class="chart chart-large" aria-label="Revenue and net profit chart"></div>
@@ -233,7 +233,7 @@
             </article>
             <article class="side-metric accent-side">
               <div class="side-metric-icon pink-icon">◔</div>
-              <div class="side-metric-copy"><span>Agency margin (LTM)</span><strong id="sideMargin">0%</strong><small id="sideMarginDelta">—</small></div>
+              <div class="side-metric-copy"><span>Project margin (month)</span><strong id="sideMargin">0%</strong><small id="sideMarginDelta">—</small></div>
               <div class="mini-line"></div>
             </article>
             <article class="side-metric">
@@ -387,7 +387,7 @@
         </div>
 
         <div class="project-summary-grid">
-          <article class="mini-stat"><span>Total payroll</span><strong id="compPayroll">$0</strong></article>
+          <article class="mini-stat"><span>Project payroll</span><strong id="compPayroll">$0</strong></article>
           <article class="mini-stat"><span>Targetologists</span><strong id="compTarget">$0</strong></article>
           <article class="mini-stat"><span>Performance</span><strong id="compPerformance">$0</strong></article>
           <article class="mini-stat"><span>Lead managers</span><strong id="compLead">$0</strong></article>
@@ -436,7 +436,7 @@
         <div class="analytics-grid">
           <article class="panel panel-wide">
             <div class="panel-head">
-              <div><span class="panel-kicker">12 MONTHS</span><h2>Agency margin</h2></div>
+              <div><span class="panel-kicker">12 MONTHS</span><h2>Project margin before operating costs</h2></div>
             </div>
             <div id="marginChart" class="chart chart-large"></div>
           </article>
