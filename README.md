@@ -65,3 +65,21 @@ No Node runtime is required.
 V1 stores data locally in the browser. This is deliberate to keep hosting and CPU usage effectively zero.
 
 For secure multi-device or multi-user sync later, add Cloudflare D1 / KV or another small datastore and protect the dashboard with Cloudflare Access.
+
+## Fixed monthly salaries for every role
+
+Team members (targetologists, performance marketers, lead managers, developers) may have
+a **fixed monthly salary** in addition to their project-based earnings.
+
+- Open **Team**, select any employee card, and use **Edit rate** to set their monthly base.
+- The base salary is an agency-wide operating expense and is **not** automatically attributed to individual projects.
+- Project salaries and commissions continue to use their existing project rules. To use a fixed-only payment model for a lead manager, set the relevant project lead-manager percentages to **0%**.
+- An employee's total accrued salary = project earnings + fixed monthly salary.
+- Base salary updates take effect from the selected month and do not rewrite prior month settings.
+- Closing a month freezes its fixed salary total, per-person rates, and role subtotals.
+- Old developer-only fixed salary records and closed monthly snapshots remain supported.
+
+**Accounting:** The dashboard distinguishes project net contribution from profit after fixed
+operating salaries. Other expenses such as rent, software subscriptions, and taxes are not
+included in this operating-profit calculation.
+
