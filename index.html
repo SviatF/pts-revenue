@@ -112,17 +112,17 @@
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiRevenueChange">No previous month data</span><div class="kpi-spark" id="sparkRevenue"></div></div>
           </article>
           <article class="kpi-card kpi-pink">
-            <div class="kpi-top"><span class="kpi-icon">▱</span><span class="kpi-label">Agency net · pre-OPEX</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">▱</span><span class="kpi-label">Agency net</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiNet">$0</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiNetChange">—</span><div class="kpi-spark" id="sparkNet"></div></div>
           </article>
           <article class="kpi-card">
-            <div class="kpi-top"><span class="kpi-icon">♧</span><span class="kpi-label">Project payroll</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">♧</span><span class="kpi-label">Total payroll</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiPayroll">$0</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiPayrollRatio">0% of revenue</span><div class="kpi-spark" id="sparkPayroll"></div></div>
           </article>
           <article class="kpi-card kpi-green">
-            <div class="kpi-top"><span class="kpi-icon">%</span><span class="kpi-label">Project margin</span><span class="kpi-menu">•••</span></div>
+            <div class="kpi-top"><span class="kpi-icon">%</span><span class="kpi-label">Agency margin</span><span class="kpi-menu">•••</span></div>
             <strong class="kpi-value" id="kpiMargin">0%</strong>
             <div class="kpi-bottom"><span class="kpi-meta" id="kpiMarginChange">—</span><div class="kpi-spark" id="sparkMargin"></div></div>
           </article>
@@ -146,22 +146,16 @@
           </article>
         </div>
 
-        <section class="operating-summary" aria-label="Agency operating expenses and profit">
-          <div><span>Agency net before operating costs</span><strong id="operatingProjectNet">$0</strong></div>
-          <div><span>Fixed team salaries · operating costs</span><strong id="operatingFixedCost">$0</strong></div>
-          <div class="operating-profit-cell"><span>Profit after fixed salaries</span><strong id="operatingProfit">$0</strong></div>
-        </section>
-
         <div class="dashboard-grid">
           <article class="panel panel-wide revenue-panel">
             <div class="panel-head">
               <div class="panel-title-row">
                 <span class="panel-icon neon">▥</span>
-                <div><h2>Revenue vs project net</h2></div>
+                <div><h2>Revenue vs agency net</h2></div>
               </div>
               <div class="legend">
                 <span><i class="legend-dot pink"></i>Revenue</span>
-                <span><i class="legend-dot gray"></i>Before operating costs</span>
+                <span><i class="legend-dot gray"></i>Agency net</span>
               </div>
             </div>
             <div id="revenueChart" class="chart chart-large" aria-label="Revenue and net profit chart"></div>
@@ -209,9 +203,9 @@
                   <tr>
                     <th>Project</th>
                     <th>Revenue</th>
-                    <th>Payroll</th>
-                    <th>Net</th>
-                    <th>Margin</th>
+                    <th>Project payroll</th>
+                    <th>Project net</th>
+                    <th>Project margin</th>
                     <th>Payment</th>
                   </tr>
                 </thead>
@@ -233,7 +227,7 @@
             </article>
             <article class="side-metric accent-side">
               <div class="side-metric-icon pink-icon">◔</div>
-              <div class="side-metric-copy"><span>Project margin (month)</span><strong id="sideMargin">0%</strong><small id="sideMarginDelta">—</small></div>
+              <div class="side-metric-copy"><span>Agency margin (month)</span><strong id="sideMargin">0%</strong><small id="sideMarginDelta">—</small></div>
               <div class="mini-line"></div>
             </article>
             <article class="side-metric">
@@ -266,7 +260,7 @@
         <div class="project-summary-grid">
           <article class="mini-stat"><span>Portfolio MRR</span><strong id="projectMrr">$0</strong></article>
           <article class="mini-stat"><span>Agency net</span><strong id="projectNet">$0</strong></article>
-          <article class="mini-stat"><span>Portfolio margin</span><strong id="projectMargin">0%</strong></article>
+          <article class="mini-stat"><span>Agency margin</span><strong id="projectMargin">0%</strong></article>
           <article class="mini-stat"><span>Projects</span><strong id="projectCount">0</strong></article>
         </div>
 
@@ -280,9 +274,9 @@
                   <th>Target</th>
                   <th>Performance</th>
                   <th>Lead</th>
-                  <th>Total payroll</th>
-                  <th>Agency net</th>
-                  <th>Margin</th>
+                  <th>Project payroll</th>
+                  <th>Project net</th>
+                  <th>Project margin</th>
                   <th></th>
                 </tr>
               </thead>
@@ -392,7 +386,7 @@
           <article class="mini-stat"><span>Performance</span><strong id="compPerformance">$0</strong></article>
           <article class="mini-stat"><span>Lead managers</span><strong id="compLead">$0</strong></article>
           <article class="mini-stat"><span>Fixed team salaries</span><strong id="compFixedSalaries">$0</strong></article>
-          <article class="mini-stat"><span>Profit after fixed salaries</span><strong id="compOperatingProfit">$0</strong></article>
+          <article class="mini-stat"><span>Agency net</span><strong id="compOperatingProfit">$0</strong></article>
         </div>
 
         <article class="panel">
@@ -413,7 +407,7 @@
                   <th>Performance</th>
                   <th>Lead</th>
                   <th>Payroll</th>
-                  <th>Agency net</th>
+                  <th>Project net</th>
                   <th>Source</th>
                   <th></th>
                 </tr>
@@ -436,7 +430,7 @@
         <div class="analytics-grid">
           <article class="panel panel-wide">
             <div class="panel-head">
-              <div><span class="panel-kicker">12 MONTHS</span><h2>Project margin before operating costs</h2></div>
+              <div><span class="panel-kicker">12 MONTHS</span><h2>Agency margin</h2></div>
             </div>
             <div id="marginChart" class="chart chart-large"></div>
           </article>
@@ -446,8 +440,8 @@
               <div><span class="panel-kicker">EFFICIENCY</span><h2>Core ratios</h2></div>
             </div>
             <div class="ratio-list">
-              <div><span>Project payroll / Revenue</span><strong id="ratioPayroll">0%</strong></div>
-              <div><span>Project margin / Revenue</span><strong id="ratioNet">0%</strong></div>
+              <div><span>Total payroll / Revenue</span><strong id="ratioPayroll">0%</strong></div>
+              <div><span>Agency net / Revenue</span><strong id="ratioNet">0%</strong></div>
               <div><span>Revenue / Team member</span><strong id="ratioRevenuePerson">$0</strong></div>
               <div><span>Top 5 revenue concentration</span><strong id="ratioConcentration">0%</strong></div>
             </div>
@@ -474,8 +468,8 @@
             <div class="forecast-grid">
               <div><span>Current MRR</span><strong id="forecastMrr">$0</strong></div>
               <div><span>Annual revenue run-rate</span><strong id="forecastRevenue">$0</strong></div>
-              <div><span>Annual operating profit run-rate</span><strong id="forecastNet">$0</strong></div>
-              <div><span>Operating margin after fixed salaries</span><strong id="forecastMargin">0%</strong></div>
+              <div><span>Annual agency net run-rate</span><strong id="forecastNet">$0</strong></div>
+              <div><span>Agency margin</span><strong id="forecastMargin">0%</strong></div>
             </div>
           </article>
         </div>
@@ -580,7 +574,7 @@
           <aside class="live-model">
             <span class="panel-kicker">MONTHLY MODEL</span>
             <div class="model-main">
-              <span>Agency net</span>
+              <span>Project net (before fixed salaries)</span>
               <strong id="modelNet">$0</strong>
               <em id="modelMargin">0% margin</em>
             </div>
@@ -705,7 +699,7 @@
           <aside class="live-model">
             <span class="panel-kicker">MONTHLY MODEL</span>
             <div class="model-main">
-              <span>Agency net</span>
+              <span>Project net (before fixed salaries)</span>
               <strong id="adjustModelNet">$0</strong>
               <em id="adjustModelMargin">0% margin</em>
             </div>

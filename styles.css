@@ -798,24 +798,6 @@ body:before{
 
 
 /* Developer operations and per-person earnings breakdown */
-.operating-summary{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
-  margin:0 0 14px;
-}
-.operating-summary>div{
-  display:flex;flex-direction:column;justify-content:center;gap:9px;
-  padding:16px 18px;border:1px solid var(--line);border-radius:13px;
-  background:linear-gradient(135deg,#10151b,#090c11);
-}
-.operating-summary span,.developer-total,.employee-detail-summary span{
-  color:#8993a0;font-size:10px;font-weight:600;letter-spacing:.035em;
-}
-.operating-summary strong{font-size:23px;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
-.operating-summary .operating-profit-cell{
-  border-color:rgba(24,242,141,.26);
-  background:linear-gradient(120deg,rgba(24,242,141,.07),#080d0e 70%);
-}
-.operating-summary .operating-profit-cell strong{color:#72ffbc}
 .role-developer{border-color:rgba(55,185,255,.21)}
 .role-developer .role-dot{background:#46d5ff;box-shadow:0 0 12px rgba(70,213,255,.5)}
 .role-head-right{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -853,14 +835,10 @@ body:before{
 .operating-salary-row td{background:rgba(70,213,255,.035)}
 .employee-details-note{font-size:10px;line-height:1.5;color:#788493;margin:18px 0 0}
 @media(max-width:900px){
-  .operating-summary{grid-template-columns:1fr 1fr}
-  .operating-summary .operating-profit-cell{grid-column:1/-1}
   #view-team .employee-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
   #view-compensation .project-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:620px){
-  .operating-summary{grid-template-columns:1fr}
-  .operating-summary .operating-profit-cell{grid-column:auto}
   .role-head-right{justify-content:flex-start}
   .role-team-head{align-items:flex-start}
   .employee-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
