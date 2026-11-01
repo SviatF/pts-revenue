@@ -21,7 +21,7 @@
   let state = loadState();
 
   function defaultState() {
-    return { version: 2, projects: [], team: [], snapshots: [], monthlySettings: [], closedMonths: [], createdAt: new Date().toISOString() };
+    return { version: 3, projects: [], team: [], snapshots: [], monthlySettings: [], memberSalarySettings: [], operatingSnapshots: [], closedMonths: [], createdAt: new Date().toISOString() };
   }
 
   function loadState() {
@@ -82,7 +82,7 @@
   }
 
   function roleLabel(role) {
-    return ({ targetologist: "Targetologist", performance: "Performance marketer", lead: "Lead manager" })[role] || role;
+    return ({ targetologist: "Targetologist", performance: "Performance marketer", lead: "Lead manager", developer: "Developer" })[role] || role;
   }
 
   function computeEconomics(revenue, targetSalary, performancePct, leadPct) {
@@ -283,15 +283,57 @@
     return { salary, roles };
   }
 
+
+  // Salary history is effective-dated. Developer costs do not belong to client projects.
+  function monthlyDeveloperSalary(member, month) {
+    if (!member || (member.startMonth && month < member.startMonth)) return 0;
+    const history = (state.memberSalarySettings || [])
+      .filter(s => s.memberId === member.id && s.effectiveMonth <= month)
+      .sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+    if (history.length) return Math.max(0, n(history[history.length - 1].salary));
+    return member.role === "developer" ? Math.max(0, n(member.monthlySalary)) : 0;
+  }
+
+  function developerExpenseForMonth(month) {
+    if (state.closedMonths.includes(month)) {
+      return Math.max(0, n((state.operatingSnapshots || []).find(s => s.month === month)?.developers));
+    }
+    return state.team.reduce((sum, member) => sum + monthlyDeveloperSalary(member, month), 0);
+  }
+
+  function ensureDeveloperBaseline(member) {
+    if (!member || member.role !== "developer") return;
+    if ((state.memberSalarySettings || []).some(s => s.memberId === member.id)) return;
+    state.memberSalarySettings.push({
+      id: uid("salary"), memberId: member.id,
+      effectiveMonth: member.startMonth || selectedMonth,
+      salary: Math.max(0, n(member.monthlySalary))
+    });
+  }
+
+  function setDeveloperSalary(memberId, month, amount) {
+    const idx = state.memberSalarySettings.findIndex(s => s.memberId === memberId && s.effectiveMonth === month);
+    const record = { id: idx >= 0 ? state.memberSalarySettings[idx].id : uid("salary"),
+      memberId, effectiveMonth: month, salary: Math.max(0, n(amount)), updatedAt: new Date().toISOString() };
+    if (idx >= 0) state.memberSalarySettings[idx] = record;
+    else state.memberSalarySettings.push(record);
+  }
+
   function memberMonthStats(memberId, month) {
     const rows = rowsForMonth(month);
     const assigned = rows.map(row => ({ row, ...salaryForMemberRow(row, memberId) })).filter(x => x.salary > 0 || x.roles.length);
-    const salary = assigned.reduce((a, x) => a + x.salary, 0);
+    const projectSalary = assigned.reduce((a, x) => a + x.salary, 0);
+    const operatingSalary = state.closedMonths.includes(month)
+      ? Math.max(0, n((state.operatingSnapshots || []).find(s => s.month === month)?.byMember?.[memberId]))
+      : monthlyDeveloperSalary(getMember(memberId), month);
+    const salary = projectSalary + operatingSalary;
     const revenue = assigned.reduce((a, x) => a + n(x.row.revenue), 0);
-    return { salary, revenue, count: assigned.length, assigned };
+    return { salary, projectSalary, operatingSalary, revenue, count: assigned.length, assigned };
   }
 
   function snapshotMonth(month) {
+    const developers = developerExpenseForMonth(month);
+    const byMember = Object.fromEntries(state.team.map(m => [m.id, monthlyDeveloperSalary(m, month)]).filter(([, pay]) => pay > 0));
     const existing = state.snapshots.filter(s => s.month !== month);
     const liveRows = state.projects.filter(p => activeForMonth(p, month)).map(p => {
       const old = state.snapshots.find(s => s.month === month && s.projectId === p.id);
@@ -304,6 +346,7 @@
       };
     });
     state.snapshots = [...existing, ...liveRows];
+    state.operatingSnapshots = [...state.operatingSnapshots.filter(s => s.month !== month), { month, developers, byMember }];
     if (!state.closedMonths.includes(month)) state.closedMonths.push(month);
     saveState();
   }
@@ -413,6 +456,10 @@
     $("#kpiRevenue").textContent = money.format(m.revenue);
     $("#kpiNet").textContent = money.format(m.net);
     $("#kpiPayroll").textContent = money.format(m.payroll);
+    const devCost = developerExpenseForMonth(selectedMonth);
+    $("#operatingDeveloperCost").textContent = money.format(devCost);
+    $("#operatingProjectNet").textContent = money.format(m.net);
+    $("#operatingProfit").textContent = money.format(m.net - devCost);
     $("#kpiMargin").textContent = pct(m.margin);
     $("#kpiProjects").textContent = m.count;
     const newProjects = state.projects.filter(p => p.startMonth === selectedMonth).length;
@@ -466,9 +513,9 @@
 
     $("#overviewProjectsTable").innerHTML = rows.length ? rows.map(r => '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(r.projectName)) + '</span><strong>' + esc(r.projectName) + '</strong></div></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.totalPayroll) + '</td><td><strong>' + money.format(r.agencyNet) + '</strong></td><td>' + pct(r.margin) + '</td><td><select class="payment-select payment-' + esc(r.paymentStatus) + '" data-payment-project="' + esc(r.projectId) + '"><option value="paid"' + (r.paymentStatus==="paid"?" selected":"") + '>Paid</option><option value="pending"' + (r.paymentStatus==="pending"?" selected":"") + '>Pending</option><option value="overdue"' + (r.paymentStatus==="overdue"?" selected":"") + ">Overdue</option></select></td></tr>").join("") : '<tr><td colspan="6" class="muted">No projects in this month.</td></tr>';
 
-    $("#sideTeamPayroll").textContent = money.format(m.payroll);
+    $("#sideTeamPayroll").textContent = money.format(m.payroll + developerExpenseForMonth(selectedMonth));
     $("#sideTeamCount").textContent = state.team.length + " team members";
-    $("#sideAvgSalary").textContent = money.format(state.team.length ? m.payroll / state.team.length : 0);
+    $("#sideAvgSalary").textContent = money.format(state.team.length ? (m.payroll + developerExpenseForMonth(selectedMonth)) / state.team.length : 0);
     $("#sideMargin").textContent = pct(m.margin);
     $("#sideMarginDelta").innerHTML = marginDelta === null ? "No prior month" : '<span class="' + (marginDelta >= 0 ? "positive" : "negative") + '">' + (marginDelta >= 0 ? "↑ " : "↓ ") + Math.abs(marginDelta).toFixed(1) + 'pp</span>';
     $("#sideRunRate").textContent = money.format(m.revenue * 12);
@@ -493,7 +540,7 @@
       const terms = settingsForProjectMonth(p, selectedMonth);
       const targetologists = normalizeTargetologists(terms);
       const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
-      const e = computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
+      const e = activeRows.find(row => row.projectId === p.id) || computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
       const performance = getMember(terms.performanceId);
       const lead = getMember(terms.leadManagerId);
       const roleCell = (member, salary, detail = "") =>
@@ -572,6 +619,8 @@
     const m = metrics(rows);
     $("#compensationMonthTitle").textContent = monthLabel(selectedMonth);
     $("#compPayroll").textContent = money.format(m.payroll);
+    $("#compDeveloper").textContent = money.format(developerExpenseForMonth(selectedMonth));
+    $("#compOperatingProfit").textContent = money.format(m.net - developerExpenseForMonth(selectedMonth));
     $("#compTarget").textContent = money.format(m.target);
     $("#compPerformance").textContent = money.format(m.performance);
     $("#compLead").textContent = money.format(m.lead);
@@ -599,7 +648,7 @@
     $("#ratioConcentration").textContent = pct(m.revenue ? top5Revenue/m.revenue*100 : 0);
 
     const maxRole = Math.max(m.target,m.performance,m.lead,1);
-    const roleItems = [["Targetologists",m.target],["Performance",m.performance],["Lead managers",m.lead]];
+    const roleItems = [["Targetologists",m.target],["Performance",m.performance],["Lead managers",m.lead],["Developers · operating",developerExpenseForMonth(selectedMonth)]];
     $("#rolePayroll").innerHTML = roleItems.map(([name,val]) => '<div class="bar-row"><div class="bar-row-head"><span>' + name + '</span><strong>' + money.format(val) + '</strong></div><div class="bar-track"><div class="bar-fill" style="width:' + (val/maxRole*100) + '%"></div></div></div>').join("");
 
     const low = [...rows].sort((a,b)=>a.margin-b.margin).slice(0,5);
@@ -607,7 +656,7 @@
 
     $("#forecastMrr").textContent = money.format(m.revenue);
     $("#forecastRevenue").textContent = money.format(m.revenue*12);
-    $("#forecastNet").textContent = money.format(m.net*12);
+    $("#forecastNet").textContent = money.format((m.net - developerExpenseForMonth(selectedMonth))*12);
     $("#forecastMargin").textContent = pct(m.margin);
   }
 
@@ -1362,6 +1411,7 @@
 
   window.PTSFinance = {
     getState:()=>structuredClone(state),
+    getOperatingCost:(month)=>developerExpenseForMonth(month),
     testFormula:()=>computeEconomics(300,100,30,5)
   };
 })();
