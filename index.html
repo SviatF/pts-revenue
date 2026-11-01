@@ -146,6 +146,12 @@
           </article>
         </div>
 
+        <section class="operating-summary" aria-label="Agency operating expenses and profit">
+          <div><span>Agency net before operating costs</span><strong id="operatingProjectNet">$0</strong></div>
+          <div><span>Developer salaries · operating costs</span><strong id="operatingDeveloperCost">$0</strong></div>
+          <div class="operating-profit-cell"><span>Profit after developer costs</span><strong id="operatingProfit">$0</strong></div>
+        </section>
+
         <div class="dashboard-grid">
           <article class="panel panel-wide revenue-panel">
             <div class="panel-head">
@@ -326,6 +332,15 @@
             </div>
             <div class="team-grid role-grid" id="leadCards"></div>
           </section>
+
+          <section class="role-team-block role-developer">
+            <div class="role-team-head">
+              <div><span class="role-dot"></span><div><span class="eyebrow">AGENCY OPERATIONS</span><h3>Developers</h3></div></div>
+              <div class="role-head-right"><span class="developer-total">Monthly operating expense <strong id="developerMonthlyTotal">$0</strong></span><button class="role-add-btn" data-add-role-member="developer">+ Add</button></div>
+            </div>
+            <p class="developer-note">Fixed monthly salaries are operating expenses, separate from project commissions.</p>
+            <div class="team-grid role-grid" id="developerCards"></div>
+          </section>
         </div>
 
         <div id="teamCards" hidden></div>
@@ -346,13 +361,14 @@
               <div><span>Salary this month</span><strong id="employeeSalary">$0</strong></div>
               <div><span>Projects</span><strong id="employeeProjectsCount">0</strong></div>
               <div><span>Revenue managed</span><strong id="employeeRevenue">$0</strong></div>
+              <div><span>Operating salary</span><strong id="employeeOperatingSalary">$0</strong></div>
               <div><span>Change</span><strong id="employeeChange">—</strong></div>
             </div>
             <div id="employeeSalaryChart" class="chart employee-chart"></div>
             <div class="table-wrap">
               <table class="data-table compact">
                 <thead>
-                  <tr><th>Project</th><th>Role</th><th>Salary</th><th>Project revenue</th></tr>
+                  <tr><th>Project / source</th><th>Role</th><th>Accrued salary</th><th>Project revenue</th><th>Client payment</th></tr>
                 </thead>
                 <tbody id="employeeProjectRows"></tbody>
               </table>
@@ -375,6 +391,8 @@
           <article class="mini-stat"><span>Targetologists</span><strong id="compTarget">$0</strong></article>
           <article class="mini-stat"><span>Performance</span><strong id="compPerformance">$0</strong></article>
           <article class="mini-stat"><span>Lead managers</span><strong id="compLead">$0</strong></article>
+          <article class="mini-stat"><span>Developers · operating</span><strong id="compDeveloper">$0</strong></article>
+          <article class="mini-stat"><span>Profit after developer costs</span><strong id="compOperatingProfit">$0</strong></article>
         </div>
 
         <article class="panel">
@@ -456,7 +474,7 @@
             <div class="forecast-grid">
               <div><span>Current MRR</span><strong id="forecastMrr">$0</strong></div>
               <div><span>Annual revenue run-rate</span><strong id="forecastRevenue">$0</strong></div>
-              <div><span>Annual net run-rate</span><strong id="forecastNet">$0</strong></div>
+              <div><span>Annual operating profit run-rate</span><strong id="forecastNet">$0</strong></div>
               <div><span>Current net margin</span><strong id="forecastMargin">0%</strong></div>
             </div>
           </article>
@@ -729,8 +747,13 @@
             <option value="targetologist">Targetologist</option>
             <option value="performance">Performance marketer</option>
             <option value="lead">Lead manager</option>
+            <option value="developer">Developer · operations</option>
           </select>
         </label>
+        <div id="developerSalaryFields" class="developer-salary-fields" hidden>
+          <label><span>Monthly salary, $</span><input id="memberMonthlySalary" type="number" min="0" step="0.01" placeholder="800" /></label>
+          <p>Operating salary is effective from <strong id="developerSalaryMonth">—</strong>. Earlier months are preserved. It is not added to client project payroll.</p>
+        </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-danger" id="deleteMemberBtn" hidden>Delete</button>
           <div class="spacer"></div>
@@ -738,6 +761,29 @@
           <button type="submit" class="btn btn-primary">Save member</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="employeeDetailsModal" hidden>
+    <div class="modal modal-large employee-details-modal" role="dialog" aria-modal="true" aria-labelledby="detailsMemberName">
+      <div class="modal-head">
+        <div><span class="eyebrow">INDIVIDUAL SALARY BREAKDOWN</span><h2 id="detailsMemberName">Employee</h2><p id="detailsMemberRole" class="details-subtitle">—</p></div>
+        <button class="icon-btn" id="closeEmployeeDetailsBtn" aria-label="Close employee details">×</button>
+      </div>
+      <div class="employee-detail-summary">
+        <div><span>Accrued salary</span><strong id="detailsSalaryTotal">$0</strong></div>
+        <div><span>From projects</span><strong id="detailsProjectSalary">$0</strong></div>
+        <div><span>Operations</span><strong id="detailsOperatingSalary">$0</strong></div>
+        <div><span>Projects</span><strong id="detailsProjectCount">0</strong></div>
+      </div>
+      <div class="employee-breakdown-title"><h3>Where earnings come from</h3><span>Selected month</span></div>
+      <div class="table-wrap">
+        <table class="data-table compact">
+          <thead><tr><th>Project / source</th><th>Project fee</th><th>Role</th><th>Accrued salary</th><th>Client payment</th></tr></thead>
+          <tbody id="detailsProjectRows"></tbody>
+        </table>
+      </div>
+      <p class="employee-details-note">Client payment status refers to the client's invoice, not whether the employee's salary has been paid. All salary amounts shown are accrued.</p>
     </div>
   </div>
 
