@@ -512,7 +512,7 @@
     const history = months.map(k => agencyMetrics(k));
     lineChart("#revenueChart", [
       { name: "Revenue", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.revenue), stroke: "#ff2f92" },
-      { name: "Net profit", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.net), stroke: "#b8c0cc" }
+      { name: "Agency net", labels: months.map(k => shortMonthFmt.format(dateFromMonth(k))), values: history.map(x => x.net), stroke: "#b8c0cc" }
     ]);
 
     miniSparkline("#sparkRevenue", history.slice(-7).map(x => x.revenue), "#18f28d");
