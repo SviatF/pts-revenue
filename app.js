@@ -21,7 +21,7 @@
   let state = loadState();
 
   function defaultState() {
-    return { version: 2, projects: [], team: [], snapshots: [], monthlySettings: [], closedMonths: [], createdAt: new Date().toISOString() };
+    return { version: 3, projects: [], team: [], snapshots: [], monthlySettings: [], memberSalarySettings: [], operatingSnapshots: [], closedMonths: [], createdAt: new Date().toISOString() };
   }
 
   function loadState() {
@@ -82,7 +82,7 @@
   }
 
   function roleLabel(role) {
-    return ({ targetologist: "Targetologist", performance: "Performance marketer", lead: "Lead manager" })[role] || role;
+    return ({ targetologist: "Targetologist", performance: "Performance marketer", lead: "Lead manager", developer: "Developer" })[role] || role;
   }
 
   function computeEconomics(revenue, targetSalary, performancePct, leadPct) {
@@ -283,15 +283,57 @@
     return { salary, roles };
   }
 
+
+  // Salary history is effective-dated. Developer costs do not belong to client projects.
+  function monthlyDeveloperSalary(member, month) {
+    if (!member || (member.startMonth && month < member.startMonth)) return 0;
+    const history = (state.memberSalarySettings || [])
+      .filter(s => s.memberId === member.id && s.effectiveMonth <= month)
+      .sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+    if (history.length) return Math.max(0, n(history[history.length - 1].salary));
+    return member.role === "developer" ? Math.max(0, n(member.monthlySalary)) : 0;
+  }
+
+  function developerExpenseForMonth(month) {
+    if (state.closedMonths.includes(month)) {
+      return Math.max(0, n((state.operatingSnapshots || []).find(s => s.month === month)?.developers));
+    }
+    return state.team.reduce((sum, member) => sum + monthlyDeveloperSalary(member, month), 0);
+  }
+
+  function ensureDeveloperBaseline(member) {
+    if (!member || member.role !== "developer") return;
+    if ((state.memberSalarySettings || []).some(s => s.memberId === member.id)) return;
+    state.memberSalarySettings.push({
+      id: uid("salary"), memberId: member.id,
+      effectiveMonth: member.startMonth || selectedMonth,
+      salary: Math.max(0, n(member.monthlySalary))
+    });
+  }
+
+  function setDeveloperSalary(memberId, month, amount) {
+    const idx = state.memberSalarySettings.findIndex(s => s.memberId === memberId && s.effectiveMonth === month);
+    const record = { id: idx >= 0 ? state.memberSalarySettings[idx].id : uid("salary"),
+      memberId, effectiveMonth: month, salary: Math.max(0, n(amount)), updatedAt: new Date().toISOString() };
+    if (idx >= 0) state.memberSalarySettings[idx] = record;
+    else state.memberSalarySettings.push(record);
+  }
+
   function memberMonthStats(memberId, month) {
     const rows = rowsForMonth(month);
     const assigned = rows.map(row => ({ row, ...salaryForMemberRow(row, memberId) })).filter(x => x.salary > 0 || x.roles.length);
-    const salary = assigned.reduce((a, x) => a + x.salary, 0);
+    const projectSalary = assigned.reduce((a, x) => a + x.salary, 0);
+    const operatingSalary = state.closedMonths.includes(month)
+      ? Math.max(0, n((state.operatingSnapshots || []).find(s => s.month === month)?.byMember?.[memberId]))
+      : monthlyDeveloperSalary(getMember(memberId), month);
+    const salary = projectSalary + operatingSalary;
     const revenue = assigned.reduce((a, x) => a + n(x.row.revenue), 0);
-    return { salary, revenue, count: assigned.length, assigned };
+    return { salary, projectSalary, operatingSalary, revenue, count: assigned.length, assigned };
   }
 
   function snapshotMonth(month) {
+    const developers = developerExpenseForMonth(month);
+    const byMember = Object.fromEntries(state.team.map(m => [m.id, monthlyDeveloperSalary(m, month)]).filter(([, pay]) => pay > 0));
     const existing = state.snapshots.filter(s => s.month !== month);
     const liveRows = state.projects.filter(p => activeForMonth(p, month)).map(p => {
       const old = state.snapshots.find(s => s.month === month && s.projectId === p.id);
@@ -304,6 +346,7 @@
       };
     });
     state.snapshots = [...existing, ...liveRows];
+    state.operatingSnapshots = [...state.operatingSnapshots.filter(s => s.month !== month), { month, developers, byMember }];
     if (!state.closedMonths.includes(month)) state.closedMonths.push(month);
     saveState();
   }
@@ -413,6 +456,10 @@
     $("#kpiRevenue").textContent = money.format(m.revenue);
     $("#kpiNet").textContent = money.format(m.net);
     $("#kpiPayroll").textContent = money.format(m.payroll);
+    const devCost = developerExpenseForMonth(selectedMonth);
+    $("#operatingDeveloperCost").textContent = money.format(devCost);
+    $("#operatingProjectNet").textContent = money.format(m.net);
+    $("#operatingProfit").textContent = money.format(m.net - devCost);
     $("#kpiMargin").textContent = pct(m.margin);
     $("#kpiProjects").textContent = m.count;
     const newProjects = state.projects.filter(p => p.startMonth === selectedMonth).length;
@@ -466,9 +513,9 @@
 
     $("#overviewProjectsTable").innerHTML = rows.length ? rows.map(r => '<tr><td><div class="project-name-cell"><span class="project-initial">' + esc(initials(r.projectName)) + '</span><strong>' + esc(r.projectName) + '</strong></div></td><td>' + money.format(r.revenue) + '</td><td>' + money.format(r.totalPayroll) + '</td><td><strong>' + money.format(r.agencyNet) + '</strong></td><td>' + pct(r.margin) + '</td><td><select class="payment-select payment-' + esc(r.paymentStatus) + '" data-payment-project="' + esc(r.projectId) + '"><option value="paid"' + (r.paymentStatus==="paid"?" selected":"") + '>Paid</option><option value="pending"' + (r.paymentStatus==="pending"?" selected":"") + '>Pending</option><option value="overdue"' + (r.paymentStatus==="overdue"?" selected":"") + ">Overdue</option></select></td></tr>").join("") : '<tr><td colspan="6" class="muted">No projects in this month.</td></tr>';
 
-    $("#sideTeamPayroll").textContent = money.format(m.payroll);
+    $("#sideTeamPayroll").textContent = money.format(m.payroll + developerExpenseForMonth(selectedMonth));
     $("#sideTeamCount").textContent = state.team.length + " team members";
-    $("#sideAvgSalary").textContent = money.format(state.team.length ? m.payroll / state.team.length : 0);
+    $("#sideAvgSalary").textContent = money.format(state.team.length ? (m.payroll + developerExpenseForMonth(selectedMonth)) / state.team.length : 0);
     $("#sideMargin").textContent = pct(m.margin);
     $("#sideMarginDelta").innerHTML = marginDelta === null ? "No prior month" : '<span class="' + (marginDelta >= 0 ? "positive" : "negative") + '">' + (marginDelta >= 0 ? "↑ " : "↓ ") + Math.abs(marginDelta).toFixed(1) + 'pp</span>';
     $("#sideRunRate").textContent = money.format(m.revenue * 12);
@@ -491,11 +538,13 @@
     $("#projectsEmpty").hidden = state.projects.length > 0;
     $("#projectsTable").innerHTML = projects.map(p => {
       const terms = settingsForProjectMonth(p, selectedMonth);
-      const targetologists = normalizeTargetologists(terms);
+      const savedRow = activeRows.find(row => row.projectId === p.id);
+      const source = savedRow || terms;
+      const targetologists = normalizeTargetologists(source);
       const targetSalary = targetologists.reduce((sum,item)=>sum+n(item.salary),0);
-      const e = computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
-      const performance = getMember(terms.performanceId);
-      const lead = getMember(terms.leadManagerId);
+      const e = savedRow || computeEconomics(terms.monthlyFee,targetSalary,terms.performancePct,terms.leadPct);
+      const performance = getMember(source.performanceId);
+      const lead = getMember(source.leadManagerId);
       const roleCell = (member, salary, detail = "") =>
         '<div class="project-role-person"><strong>' + esc(member?.name || "Unassigned") + '</strong><span>' + money.format(salary) + (detail ? ' · ' + detail : '') + '</span></div>';
       const targetCell = targetologists.length
@@ -516,14 +565,15 @@
 
   function teamMemberCard(member) {
     const s = memberMonthStats(member.id, selectedMonth);
-    return '<article class="team-card" data-member-card="' + member.id + '"><div class="team-card-top"><span class="avatar">' + esc(initials(member.name)) + '</span><div class="team-card-name"><strong>' + esc(member.name) + '</strong><span>' + esc(roleLabel(member.role)) + '</span></div><button class="small-icon-btn" style="margin-left:auto" data-edit-member="' + member.id + '">···</button></div><div class="team-card-pay"><div><span>Salary this month</span><strong>' + money.format(s.salary) + '</strong></div><div><span>Projects</span><strong>' + s.count + '</strong></div></div></article>';
+    return '<article class="team-card employee-open-card" role="button" tabindex="0" aria-label="View earnings for ' + esc(member.name) + '" data-member-card="' + member.id + '"><div class="team-card-top"><span class="avatar">' + esc(initials(member.name)) + '</span><div class="team-card-name"><strong>' + esc(member.name) + '</strong><span>' + esc(roleLabel(member.role)) + '</span></div><button class="small-icon-btn" style="margin-left:auto" data-edit-member="' + member.id + '" aria-label="Edit ' + esc(member.name) + '">···</button></div><div class="team-card-pay"><div><span>Salary this month</span><strong>' + money.format(s.salary) + '</strong></div><div><span>Projects</span><strong>' + s.count + '</strong></div></div><div class="employee-card-hint">' + (s.operatingSalary > 0 ? 'Operating expense · ' : '') + 'View salary breakdown →</div></article>';
   }
 
   function renderTeam() {
     const groups = [
       ["targetologist","#targetologistCards"],
       ["performance","#performanceCards"],
-      ["lead","#leadCards"]
+      ["lead","#leadCards"],
+      ["developer","#developerCards"]
     ];
 
     groups.forEach(([role, selector]) => {
@@ -534,6 +584,7 @@
     });
 
     $("#teamCards").innerHTML = "";
+    $("#developerMonthlyTotal").textContent = money.format(developerExpenseForMonth(selectedMonth));
 
     const select = $("#employeeSelect");
     const current = selectedEmployeeId || select.value;
@@ -556,6 +607,7 @@
     $("#employeeAnalytics").hidden = false;
     $("#employeeAnalyticsTitle").textContent = member.name + " · " + roleLabel(member.role);
     $("#employeeSalary").textContent = money.format(stats.salary);
+    $("#employeeOperatingSalary").textContent = money.format(stats.operatingSalary);
     $("#employeeProjectsCount").textContent = stats.count;
     $("#employeeRevenue").textContent = money.format(stats.revenue);
     $("#employeeChange").innerHTML = ch === null ? "—" : '<span class="' + (ch>=0?"positive":"negative") + '">' + (ch>=0?"+":"") + pct(ch) + "</span>";
@@ -564,7 +616,10 @@
     const values = months.map(k => memberMonthStats(selectedEmployeeId,k).salary);
     lineChart("#employeeSalaryChart", [{ name:"Salary", labels:months.map(k=>shortMonthFmt.format(dateFromMonth(k))), values, stroke:"#ff2f92" }]);
 
-    $("#employeeProjectRows").innerHTML = stats.assigned.length ? stats.assigned.map(x => '<tr><td><strong>' + esc(x.row.projectName) + '</strong></td><td>' + esc(x.roles.join(", ")) + '</td><td><strong>' + money.format(x.salary) + '</strong></td><td>' + money.format(x.row.revenue) + "</td></tr>").join("") : '<tr><td colspan="4" class="muted">No assigned projects in this month.</td></tr>';
+    const projectLines = stats.assigned.map(x => '<tr><td><strong>' + esc(x.row.projectName) + '</strong></td><td>' + esc(x.roles.join(", ")) + '</td><td><strong>' + money2.format(x.salary) + '</strong></td><td>' + money2.format(x.row.revenue) + '</td><td>' + esc(x.row.paymentStatus || "pending") + '</td></tr>').join("");
+    const operatingLine = stats.operatingSalary > 0
+      ? '<tr class="operating-salary-row"><td><strong>Agency operations</strong></td><td>Developer · fixed monthly</td><td><strong>' + money2.format(stats.operatingSalary) + '</strong></td><td>—</td><td>Internal expense</td></tr>' : "";
+    $("#employeeProjectRows").innerHTML = projectLines + operatingLine || '<tr><td colspan="5" class="muted">No earnings in this month.</td></tr>';
   }
 
   function renderCompensation() {
@@ -572,6 +627,8 @@
     const m = metrics(rows);
     $("#compensationMonthTitle").textContent = monthLabel(selectedMonth);
     $("#compPayroll").textContent = money.format(m.payroll);
+    $("#compDeveloper").textContent = money.format(developerExpenseForMonth(selectedMonth));
+    $("#compOperatingProfit").textContent = money.format(m.net - developerExpenseForMonth(selectedMonth));
     $("#compTarget").textContent = money.format(m.target);
     $("#compPerformance").textContent = money.format(m.performance);
     $("#compLead").textContent = money.format(m.lead);
@@ -599,7 +656,7 @@
     $("#ratioConcentration").textContent = pct(m.revenue ? top5Revenue/m.revenue*100 : 0);
 
     const maxRole = Math.max(m.target,m.performance,m.lead,1);
-    const roleItems = [["Targetologists",m.target],["Performance",m.performance],["Lead managers",m.lead]];
+    const roleItems = [["Targetologists",m.target],["Performance",m.performance],["Lead managers",m.lead],["Developers · operating",developerExpenseForMonth(selectedMonth)]];
     $("#rolePayroll").innerHTML = roleItems.map(([name,val]) => '<div class="bar-row"><div class="bar-row-head"><span>' + name + '</span><strong>' + money.format(val) + '</strong></div><div class="bar-track"><div class="bar-fill" style="width:' + (val/maxRole*100) + '%"></div></div></div>').join("");
 
     const low = [...rows].sort((a,b)=>a.margin-b.margin).slice(0,5);
@@ -607,7 +664,7 @@
 
     $("#forecastMrr").textContent = money.format(m.revenue);
     $("#forecastRevenue").textContent = money.format(m.revenue*12);
-    $("#forecastNet").textContent = money.format(m.net*12);
+    $("#forecastNet").textContent = money.format((m.net - developerExpenseForMonth(selectedMonth))*12);
     $("#forecastMargin").textContent = pct(m.margin);
   }
 
@@ -701,6 +758,7 @@
     if (currentView === "team") renderTeam();
     if (currentView === "compensation") renderCompensation();
     if (currentView === "analytics") renderAnalytics();
+    if (!$("#employeeDetailsModal").hidden && selectedEmployeeId) renderEmployeeDetails(selectedEmployeeId);
     scheduleMotion();
   }
 
@@ -1101,6 +1159,54 @@
     }, "Remove");
   }
 
+
+  function updateMemberSalaryVisibility() {
+    const isDeveloper = $("#memberRole").value === "developer";
+    $("#developerSalaryFields").hidden = !isDeveloper;
+    $("#developerSalaryMonth").textContent = monthLabel(selectedMonth);
+    $("#memberMonthlySalary").required = isDeveloper;
+  }
+
+  function renderEmployeeDetails(memberId) {
+    const member = getMember(memberId);
+    if (!member) { closeEmployeeDetails(); return; }
+    const stats = memberMonthStats(memberId, selectedMonth);
+    $("#detailsMemberName").textContent = member.name;
+    $("#detailsMemberRole").textContent = roleLabel(member.role) + " · " + monthLabel(selectedMonth);
+    $("#detailsSalaryTotal").textContent = money2.format(stats.salary);
+    $("#detailsProjectSalary").textContent = money2.format(stats.projectSalary);
+    $("#detailsOperatingSalary").textContent = money2.format(stats.operatingSalary);
+    $("#detailsProjectCount").textContent = String(stats.count);
+    const projectRows = stats.assigned.map(item => {
+      const payment = item.row.paymentStatus || "pending";
+      const components = [];
+      const targetAmount = normalizeTargetologists(item.row)
+        .filter(t => t.memberId === memberId).reduce((sum, t) => sum + n(t.salary), 0);
+      if (item.roles.includes("Targetologist")) components.push("Target " + money2.format(targetAmount));
+      if (item.roles.includes("Performance")) components.push("Performance " + money2.format(item.row.performanceSalary));
+      if (item.roles.includes("Lead manager")) components.push("Lead " + money2.format(item.row.leadSalary));
+      return '<tr><td><strong>' + esc(item.row.projectName) + '</strong><small class="earnings-source">' + esc(components.join(" + ")) + '</small></td><td>' +
+        money2.format(item.row.revenue) + '</td><td>' + esc(item.roles.join(", ")) + '</td><td><strong>' +
+        money2.format(item.salary) + '</strong></td><td><span class="employee-payment payment-' + esc(payment) +
+        '">' + esc(payment) + '</span></td></tr>';
+    }).join("");
+    const opRow = stats.operatingSalary > 0
+      ? '<tr class="operating-salary-row"><td><strong>Agency operations</strong><small class="earnings-source">Fixed developer salary · not tied to client payments</small></td><td>—</td><td>Developer</td><td><strong>' +
+        money2.format(stats.operatingSalary) + '</strong></td><td>Internal cost</td></tr>' : "";
+    $("#detailsProjectRows").innerHTML = projectRows + opRow || '<tr><td colspan="5" class="muted">No projects or salary entries for this month.</td></tr>';
+  }
+
+  function openEmployeeDetails(memberId) {
+    if (!getMember(memberId)) return;
+    selectedEmployeeId = memberId;
+    $("#employeeDetailsModal").hidden = false;
+    renderEmployeeDetails(memberId);
+  }
+
+  function closeEmployeeDetails() {
+    $("#employeeDetailsModal").hidden = true;
+  }
+
   function openMemberModal(id="", presetRole="", assignAfterCreate=false){
     const m=state.team.find(x=>x.id===id);
     pendingAssignmentRole = !m && assignAfterCreate ? presetRole : "";
@@ -1110,6 +1216,8 @@
     $("#memberName").value=m?.name||"";
     $("#memberRole").value=m?.role||presetRole||"targetologist";
     $("#memberRole").disabled = Boolean(presetRole && !m);
+    $("#memberMonthlySalary").value = m ? monthlyDeveloperSalary(m, selectedMonth) : "";
+    updateMemberSalaryVisibility();
     $("#deleteMemberBtn").hidden=!m;
     setTimeout(()=>$("#memberName").focus(),0);
   }
@@ -1125,15 +1233,26 @@
     const role=$("#memberRole").value;
     const member={id:id||uid("tm"),name:$("#memberName").value.trim(),role,status:"active",updatedAt:new Date().toISOString()};
     if(!member.name)return;
-
+    const previous = id ? getMember(id) : null;
+    const affectsDeveloperRate = role === "developer" || previous?.role === "developer";
+    if (affectsDeveloperRate && state.closedMonths.includes(selectedMonth)) {
+      showToast("Month is closed. Select an open month to change developer salary.");
+      return;
+    }
+    const monthlySalary = role === "developer" ? Math.max(0, n($("#memberMonthlySalary").value)) : 0;
     const assignmentRole = pendingAssignmentRole;
     if(id){
+      if (previous?.role === "developer") ensureDeveloperBaseline(previous);
       const idx=state.team.findIndex(x=>x.id===id);
       if(idx>=0)state.team[idx]={...state.team[idx],...member};
+      if (affectsDeveloperRate) setDeveloperSalary(member.id, selectedMonth, monthlySalary);
       showToast("Member updated");
     }else{
       member.createdAt=new Date().toISOString();
+      member.startMonth=selectedMonth;
+      member.monthlySalary=monthlySalary;
       state.team.push(member);
+      if (role === "developer") setDeveloperSalary(member.id, selectedMonth, monthlySalary);
       showToast(roleLabel(member.role) + " added");
     }
 
@@ -1275,8 +1394,11 @@
   $("#removeAdjustmentBtn").addEventListener("click",removeAdjustment);
   $$("[data-close-member]").forEach(x=>x.addEventListener("click",closeMemberModal));
   $("#memberForm").addEventListener("submit",submitMember);
+  $("#memberRole").addEventListener("change",updateMemberSalaryVisibility);
   $("#deleteMemberBtn").addEventListener("click",deleteMember);
   $("#employeeSelect").addEventListener("change",e=>{selectedEmployeeId=e.target.value;renderTeam();});
+  $("#closeEmployeeDetailsBtn").addEventListener("click",closeEmployeeDetails);
+  $("#employeeDetailsModal").addEventListener("click",e=>{if(e.target===$("#employeeDetailsModal"))closeEmployeeDetails();});
   $("#exportDataBtn").addEventListener("click",exportData);
   $("#importDataInput").addEventListener("change",e=>{importData(e.target.files[0]);e.target.value="";});
   $("#confirmCancel").addEventListener("click",hideConfirm);
@@ -1309,7 +1431,7 @@
     const editMember=e.target.closest("[data-edit-member]");
     if(editMember){e.stopPropagation();openMemberModal(editMember.dataset.editMember);return;}
     const memberCard=e.target.closest("[data-member-card]");
-    if(memberCard){selectedEmployeeId=memberCard.dataset.memberCard;setView("team");return;}
+    if(memberCard){openEmployeeDetails(memberCard.dataset.memberCard);return;}
   });
 
   document.addEventListener("change",e=>{
@@ -1318,7 +1440,11 @@
   });
 
   document.addEventListener("keydown",e=>{
-    if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeEndCollaborationModal();closeMemberModal();hideConfirm();$("#sidebar").classList.remove("open");}
+    if(e.key==="Escape"){closeProjectModal();closeAdjustmentModal();closeEndCollaborationModal();closeMemberModal();closeEmployeeDetails();hideConfirm();$("#sidebar").classList.remove("open");}
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches('[data-member-card]')) {
+      e.preventDefault();
+      openEmployeeDetails(e.target.dataset.memberCard);
+    }
   });
 
   if (!reduceMotion) {
@@ -1362,6 +1488,7 @@
 
   window.PTSFinance = {
     getState:()=>structuredClone(state),
+    getOperatingCost:(month)=>developerExpenseForMonth(month),
     testFormula:()=>computeEconomics(300,100,30,5)
   };
 })();
