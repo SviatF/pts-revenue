@@ -27,14 +27,15 @@ The dashboard calculates:
 - Performance base = $300 - $100 = $200
 - Performance salary = $200 × 30% = $60
 - Lead manager salary = $300 × 5% = $15
-- Total payroll = $175
-- Agency net = $125
-- Net margin = 41.67%
+- Project payroll = $175
+- Project contribution before agency-wide salaries = $125
+- Agency net = $125 - any additional fixed monthly team rates
+- Agency margin = Agency net / $300
 
 ## Features
 
 - Monthly revenue / payroll / agency net overview
-- Revenue vs net-profit 12-month chart
+- Revenue vs agency net (after fixed team salaries) 12-month chart
 - Project profitability table
 - Automatic salary formulas
 - Team assignments
@@ -79,7 +80,15 @@ a **fixed monthly salary** in addition to their project-based earnings.
 - Closing a month freezes its fixed salary total, per-person rates, and role subtotals.
 - Old developer-only fixed salary records and closed monthly snapshots remain supported.
 
-**Accounting:** The dashboard distinguishes project net contribution from profit after fixed
-operating salaries. Other expenses such as rent, software subscriptions, and taxes are not
-included in this operating-profit calculation.
+**Accounting:** The top-level **Agency net** is now the single financial result, calculated as
+total project revenue minus project-level payroll and minus all agency-wide fixed monthly
+salary rates (across every team role). Total payroll includes both components.
+The three former operating-summary cards were removed from Overview. The same net
+figure drives the main KPI, agency margin, history charts, cost breakdown, portfolio
+summary and profit run-rate; fixed monthly rates are subtracted exactly once.
+Individual project profit figures still show project contribution before overhead;
+there is no arbitrary allocation of shared salaries across clients.
+
+Other expenses such as rent, software subscriptions, and taxes are **not** included in
+Agency net unless added to the financial model separately.
 
